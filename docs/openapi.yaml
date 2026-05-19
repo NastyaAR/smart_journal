@@ -1,0 +1,942 @@
+openapi: 3.0.3
+info:
+  title: Smart Journal API
+  description: API умного учебного журнала с ролями учителя и ученика.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+tags:
+  - name: Health
+  - name: Auth
+  - name: Students
+  - name: Teachers
+security:
+  - SessionCookie: []
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Проверка доступности API
+      security: []
+      responses:
+        "200":
+          description: API доступен
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Авторизация ученика или учителя
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              teacher:
+                summary: Учитель
+                value:
+                  login: anna.ivanova@school.edu
+                  password: password
+              student:
+                summary: Ученик
+                value:
+                  login: ivan.petrov@example.com
+                  password: secret
+      responses:
+        "200":
+          description: Успешный вход
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выход из текущей сессии
+      responses:
+        "200":
+          description: Сессия завершена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/session:
+    get:
+      tags: [Auth]
+      summary: Информация о текущей сессии
+      responses:
+        "200":
+          description: Текущая сессия
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /register:
+    post:
+      tags: [Students]
+      summary: Регистрация ученика
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterStudentRequest"
+      responses:
+        "201":
+          description: Ученик зарегистрирован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Student registered successfully
+                  id:
+                    type: integer
+                    example: 1
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /students/group:
+    get:
+      tags: [Students]
+      summary: Группа текущего ученика и список одногруппников
+      responses:
+        "200":
+          description: Группа и ученики
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  group:
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/Group"
+                  students:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Student"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/grades:
+    get:
+      tags: [Students]
+      summary: Оценки группы текущего ученика
+      responses:
+        "200":
+          description: Список оценок с именами ученика и предмета
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GradeView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/balance:
+    get:
+      tags: [Students]
+      summary: Баланс токенов текущего ученика
+      responses:
+        "200":
+          description: Баланс токенов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: string
+                    example: "100"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/merch:
+    get:
+      tags: [Students]
+      summary: Список доступного мерча
+      responses:
+        "200":
+          description: Список мерча
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Merch"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/merch/buy:
+    post:
+      tags: [Students]
+      summary: Покупка мерча за токены
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuyMerchRequest"
+      responses:
+        "200":
+          description: Покупка выполнена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /students/purchases:
+    get:
+      tags: [Students]
+      summary: История покупок текущего ученика
+      responses:
+        "200":
+          description: Список покупок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Purchase"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /students/achievements:
+    get:
+      tags: [Students]
+      summary: Заявки текущего ученика на дополнительные активности
+      responses:
+        "200":
+          description: Список заявок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Achievement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Students]
+      summary: Создать заявку на дополнительную активность
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAchievementRequest"
+      responses:
+        "201":
+          description: Заявка создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Achievement"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/groups:
+    get:
+      tags: [Teachers]
+      summary: Список групп текущего учителя
+      responses:
+        "200":
+          description: Список групп
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Teachers]
+      summary: Создать группу и привязать к текущему учителю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupRequest"
+      responses:
+        "201":
+          description: Группа создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/groups/attach:
+    post:
+      tags: [Teachers]
+      summary: Привязать существующую группу к текущему учителю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachGroupRequest"
+      responses:
+        "200":
+          description: Группа привязана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/groups/{id}/grades:
+    get:
+      tags: [Teachers]
+      summary: Оценки группы
+      parameters:
+        - $ref: "#/components/parameters/GroupID"
+      responses:
+        "200":
+          description: Список оценок с именами ученика и предмета
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GradeView"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/subjects:
+    post:
+      tags: [Teachers]
+      summary: Создать предмет и привязать к текущему учителю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubjectRequest"
+      responses:
+        "201":
+          description: Предмет создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subject"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/subjects/attach:
+    post:
+      tags: [Teachers]
+      summary: Привязать существующий предмет к текущему учителю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachSubjectRequest"
+      responses:
+        "200":
+          description: Предмет привязан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/groups/add-student:
+    post:
+      tags: [Teachers]
+      summary: Добавить ученика в группу текущего учителя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddStudentToGroupRequest"
+      responses:
+        "200":
+          description: Ученик добавлен в группу
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/grades:
+    post:
+      tags: [Teachers]
+      summary: Поставить оценку ученику
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGradeRequest"
+      responses:
+        "201":
+          description: Оценка создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grade"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/achievements/pending:
+    get:
+      tags: [Teachers]
+      summary: Pending-заявки учеников из групп текущего учителя
+      responses:
+        "200":
+          description: Список заявок на подтверждение
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Achievement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/achievements/confirm:
+    post:
+      tags: [Teachers]
+      summary: Подтвердить активность и начислить токены
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AchievementActionRequest"
+      responses:
+        "200":
+          description: Активность подтверждена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/achievements/deny:
+    post:
+      tags: [Teachers]
+      summary: Отклонить активность
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AchievementActionRequest"
+      responses:
+        "200":
+          description: Активность отклонена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /teachers/tokens/award:
+    post:
+      tags: [Teachers]
+      summary: Вручную начислить токены ученику из группы учителя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AwardTokensRequest"
+      responses:
+        "200":
+          description: Токены начислены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_id
+
+  parameters:
+    GroupID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Пользователь не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Объект не найден
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid request
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operation completed successfully
+
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          example: anna.ivanova@school.edu
+        password:
+          type: string
+          example: password
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Login successful
+        role:
+          type: string
+          enum: [student, teacher]
+          example: teacher
+
+    SessionResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        role:
+          type: string
+          enum: [student, teacher]
+          example: student
+
+    RegisterStudentRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: Иван Петров
+        email:
+          type: string
+          format: email
+          example: ivan.petrov@example.com
+        group_id:
+          type: integer
+          nullable: true
+          description: Можно не передавать или передать 0, если ученика позже добавит учитель.
+          example: 1
+        password:
+          type: string
+          example: secret
+
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: БПИ-231
+
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: БПИ-231
+
+    AttachGroupRequest:
+      type: object
+      required: [group_id]
+      properties:
+        group_id:
+          type: integer
+          example: 1
+
+    Subject:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Математика
+
+    CreateSubjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Математика
+
+    AttachSubjectRequest:
+      type: object
+      required: [subject_id]
+      properties:
+        subject_id:
+          type: integer
+          example: 1
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Иван Петров
+        email:
+          type: string
+          format: email
+          example: ivan.petrov@example.com
+        group_id:
+          type: integer
+          example: 1
+        tokens:
+          type: integer
+          example: 70
+        user_id:
+          type: integer
+          example: 2
+
+    Grade:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_id:
+          type: integer
+          example: 1
+        subject_id:
+          type: integer
+          example: 1
+        value:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+
+    GradeView:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_id:
+          type: integer
+          example: 1
+        student_name:
+          type: string
+          example: Иван Петров
+        subject_id:
+          type: integer
+          example: 1
+        subject_name:
+          type: string
+          example: Математика
+        value:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+
+    CreateGradeRequest:
+      type: object
+      required: [student_id, subject_id, value]
+      properties:
+        student_id:
+          type: integer
+          example: 1
+        subject_id:
+          type: integer
+          example: 1
+        value:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+
+    AddStudentToGroupRequest:
+      type: object
+      required: [student_id, group_id]
+      properties:
+        student_id:
+          type: integer
+          example: 1
+        group_id:
+          type: integer
+          example: 1
+
+    Achievement:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Участие в олимпиаде
+        description:
+          type: string
+          example: Решил региональный этап
+        status:
+          type: string
+          enum: [pending, confirmed, denied]
+          example: pending
+        confirmed:
+          type: boolean
+          example: false
+        confirmed_by_teacher_id:
+          type: integer
+          example: 1
+
+    CreateAchievementRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          example: Участие в олимпиаде
+        description:
+          type: string
+          example: Решил региональный этап
+
+    AchievementActionRequest:
+      type: object
+      required: [achievement_id]
+      properties:
+        achievement_id:
+          type: integer
+          example: 1
+
+    AwardTokensRequest:
+      type: object
+      required: [student_id, amount]
+      properties:
+        student_id:
+          type: integer
+          example: 1
+        amount:
+          type: integer
+          minimum: 1
+          example: 10
+
+    Merch:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Футболка с логотипом школы
+        description:
+          type: string
+          example: Хлопковая футболка, размеры S-XXL
+        price:
+          type: integer
+          example: 30
+
+    BuyMerchRequest:
+      type: object
+      required: [merch_id]
+      properties:
+        merch_id:
+          type: integer
+          example: 1
+
+    Purchase:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_id:
+          type: integer
+          example: 1
+        merch_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Футболка с логотипом школы
+        price:
+          type: integer
+          example: 30
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-18T12:00:00Z"
+
+    PurchaseResult:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Purchase successful
+        merch:
+          $ref: "#/components/schemas/Merch"
+        purchase_id:
+          type: integer
+          example: 1
+        new_balance:
+          type: integer
+          example: 70

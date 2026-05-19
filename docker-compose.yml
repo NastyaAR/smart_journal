@@ -1,0 +1,79 @@
+services:
+  postgres:
+    container_name: postgres_container
+    image: postgres:17.5-alpine3.22
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=50"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.max=10000"
+      - "-c"
+      - "pg_stat_statements.track=all"
+    environment:
+      POSTGRES_DB: ${PSQL_DB}
+      POSTGRES_USER: ${PSQL_USER}
+      POSTGRES_PASSWORD: ${PSQL_PASSWORD}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 4G
+    networks:
+      - dev
+
+  migrations:
+    image: kukymbr/goose-docker:3.24.3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PSQL_DB: ${PSQL_DB}
+      PSQL_USER: ${PSQL_USER}
+      PSQL_PASSWORD: ${PSQL_PASSWORD}
+      PSQL_PORT: ${PSQL_PORT:-5432}
+      PSQL_HOST: ${PSQL_HOST:-postgres}
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: postgres://${PSQL_USER}:${PSQL_PASSWORD}@${PSQL_HOST:-postgres}:${PSQL_PORT:-5432}/${PSQL_DB}?sslmode=disable
+    volumes:
+      - ./migrations:/migrations
+    networks:
+      - dev
+
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: swagger_ui
+    ports:
+      - "8081:8080"
+    environment:
+      SWAGGER_JSON: /docs/openapi.yaml
+    volumes:
+      - ./docs:/docs
+    restart: unless-stopped
+    networks:
+      - dev
+
+    
+volumes:
+  postgres:
+
+networks:
+    dev: 
+        driver: bridge
