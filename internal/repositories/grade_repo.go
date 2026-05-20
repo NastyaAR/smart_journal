@@ -101,3 +101,31 @@ func (r *GradeRepository) GetGradeViewsByGroupID(ctx context.Context, groupID in
 	}
 	return grades, nil
 }
+
+func (r *GradeRepository) GetGradeViewsByStudentID(ctx context.Context, studentID int) ([]*models.GradeView, error) {
+	query := `
+		SELECT g.id, g.student_id, s.name, g.subject_id, sub.name, g.value
+		FROM grades g
+		JOIN students s ON s.id = g.student_id
+		JOIN subjects sub ON sub.id = g.subject_id
+		WHERE g.student_id = $1
+		ORDER BY sub.name, g.id`
+	rows, err := r.pool.Query(ctx, query, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student grade views: %w", err)
+	}
+	defer rows.Close()
+
+	var grades []*models.GradeView
+	for rows.Next() {
+		var grade models.GradeView
+		if err := rows.Scan(&grade.ID, &grade.StudentID, &grade.StudentName, &grade.SubjectID, &grade.SubjectName, &grade.Value); err != nil {
+			return nil, fmt.Errorf("failed to scan grade view: %w", err)
+		}
+		grades = append(grades, &grade)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+	return grades, nil
+}

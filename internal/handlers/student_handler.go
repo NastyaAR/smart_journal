@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"blockchain_project/internal/models"
@@ -13,13 +15,15 @@ import (
 )
 
 type StudentHandler struct {
-	studentService  *services.StudentService
-	achievementRepo *repositories.AchievementRepository
-	gradeRepo       *repositories.GradeRepository
-	groupRepo       *repositories.GroupRepository
-	subjectRepo     *repositories.SubjectRepository
-	merchRepo       *repositories.MerchRepository
-	authHandler     *AuthHandler
+	studentService     *services.StudentService
+	achievementRepo    *repositories.AchievementRepository
+	gradeRepo          *repositories.GradeRepository
+	groupRepo          *repositories.GroupRepository
+	subjectRepo        *repositories.SubjectRepository
+	merchRepo          *repositories.MerchRepository
+	recommendationRepo *repositories.RecommendationRepository
+	aiService          *services.AIService
+	authHandler        *AuthHandler
 }
 
 func NewStudentHandler(
@@ -29,16 +33,20 @@ func NewStudentHandler(
 	groupRepo *repositories.GroupRepository,
 	subjectRepo *repositories.SubjectRepository,
 	merchRepo *repositories.MerchRepository,
+	recommendationRepo *repositories.RecommendationRepository,
+	aiService *services.AIService,
 	authHandler *AuthHandler,
 ) *StudentHandler {
 	return &StudentHandler{
-		studentService:  studentService,
-		achievementRepo: achievementRepo,
-		gradeRepo:       gradeRepo,
-		groupRepo:       groupRepo,
-		subjectRepo:     subjectRepo,
-		merchRepo:       merchRepo,
-		authHandler:     authHandler,
+		studentService:     studentService,
+		achievementRepo:    achievementRepo,
+		gradeRepo:          gradeRepo,
+		groupRepo:          groupRepo,
+		subjectRepo:        subjectRepo,
+		merchRepo:          merchRepo,
+		recommendationRepo: recommendationRepo,
+		aiService:          aiService,
+		authHandler:        authHandler,
 	}
 }
 
@@ -284,6 +292,85 @@ func (h *StudentHandler) GetPurchases(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(purchases)
+}
+
+func (h *StudentHandler) GenerateRecommendations(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	student, err := h.currentStudent(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	grades, err := h.gradeRepo.GetGradeViewsByStudentID(ctx, student.ID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if len(grades) == 0 {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "No grades found for recommendations"})
+	}
+
+	studentName, studentSurname := splitStudentName(student.Name)
+	req := &models.AIRecommendationRequest{
+		StudentID:      strconv.Itoa(student.ID),
+		StudentName:    studentName,
+		StudentSurname: studentSurname,
+		Grades:         make([]models.AIGrade, 0, len(grades)),
+	}
+	for _, grade := range grades {
+		req.Grades = append(req.Grades, models.AIGrade{
+			Subject: grade.SubjectName,
+			Score:   gradeScore(grade.Value),
+		})
+	}
+
+	recommendation, err := h.aiService.GetRecommendations(ctx, req)
+	if err != nil {
+		return c.Status(http.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	stored, err := h.recommendationRepo.CreateRecommendation(ctx, student.ID, recommendation)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(http.StatusCreated).JSON(stored)
+}
+
+func (h *StudentHandler) GetLatestRecommendation(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	student, err := h.currentStudent(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	recommendation, err := h.recommendationRepo.GetLatestByStudentID(ctx, student.ID)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(recommendation)
+}
+
+func splitStudentName(fullName string) (string, string) {
+	parts := strings.Fields(fullName)
+	if len(parts) == 0 {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], " ")
+}
+
+func gradeScore(value int) int {
+	if value <= 5 {
+		return value * 20
+	}
+	return value
 }
 
 func (h *StudentHandler) RequireAuth(c *fiber.Ctx) error {
