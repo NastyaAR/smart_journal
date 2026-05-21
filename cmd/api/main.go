@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,9 +16,16 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	fmt.Println(os.Getenv("DATABASE_URL"))
+
 	app := fiber.New(fiber.Config{
 		AppName:      "Smart Journal API",
 		ServerHeader: "Fiber",
@@ -30,7 +38,7 @@ func main() {
 
 	connString := os.Getenv("DATABASE_URL")
 	if connString == "" {
-		connString = "postgres://admin:password@0.0.0.0:5432/smartjournal?sslmode=disable"
+		connString = os.Getenv("DATABASE_URL")
 	}
 	postgresRepo, err := repositories.NewPostgresRepository(ctx, connString)
 	if err != nil {

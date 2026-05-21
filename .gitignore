@@ -1,0 +1,34 @@
+# PostgreSQL data
+postgres/
+postgres/pgdata/
+postgres/pgdata/*
+*.pid
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build files
+contract/
+contract/build/
+frontend/dist/
+frontend/build/
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
