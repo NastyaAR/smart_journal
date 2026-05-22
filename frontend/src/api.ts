@@ -25,6 +25,69 @@ export class ApiError extends Error {
   }
 }
 
+export function getReadableErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    const message = error.message.toLowerCase();
+    const status = error.status;
+    
+    if (status === 401 || message.includes('invalid credentials') || message.includes('unauthorized')) {
+      return 'Неверный email или пароль. Проверьте правильность ввода.';
+    }
+    
+    if (message.includes('fetch') || message.includes('network') || message.includes('failed to fetch')) {
+      return 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.';
+    }
+    
+    if (message.includes('not found') && message.includes('user')) {
+      return 'Пользователь с таким email не найден. Зарегистрируйтесь или проверьте email.';
+    }
+    
+    if (message.includes('already exists') || message.includes('already taken')) {
+      return 'Пользователь с таким email уже зарегистрирован. Используйте другой email или войдите.';
+    }
+    
+    if (status === 400) {
+      if (message.includes('password')) {
+        return 'Пароль слишком простой. Используйте минимум 6 символов.';
+      }
+      if (message.includes('email')) {
+        return 'Введите корректный email адрес.';
+      }
+      return 'Проверьте правильность заполнения формы.';
+    }
+    
+    if (status === 403) {
+      return 'Доступ запрещен. У вас недостаточно прав.';
+    }
+    
+    if (status === 404) {
+      return 'Запрашиваемые данные не найдены.';
+    }
+    
+    if (status >= 500) {
+      return 'Сервер временно недоступен. Попробуйте позже.';
+    }
+    
+    if (error.message && error.message.length < 100 && !error.message.includes('stack')) {
+      return error.message;
+    }
+    
+    return 'Что-то пошло не так. Попробуйте обновить страницу.';
+  }
+  
+  if (error instanceof Error) {
+    if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+      return 'Ошибка сети. Проверьте соединение с интернетом.';
+    }
+    return error.message;
+  }
+  
+  return 'Произошла неизвестная ошибка. Попробуйте позже.';
+}
+
+// Старая функция для обратной совместимости
+export const readableError = getReadableErrorMessage;
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -37,16 +100,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const contentType = response.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");
-  const body = isJson ? await response.json() : await response.text();
+  
+  let body;
+  try {
+    body = isJson ? await response.json() : await response.text();
+  } catch {
+    body = null;
+  }
 
   if (!response.ok) {
-    const message =
-      typeof body === "object" && body && "error" in body
-        ? String(body.error)
-        : typeof body === "string" && body
-          ? body
-          : "Запрос не выполнен";
-    throw new ApiError(message, response.status);
+    let errorMessage = "Запрос не выполнен";
+    
+    if (typeof body === "object" && body) {
+      errorMessage = body.error || body.message || body.detail || String(body);
+    } else if (typeof body === "string" && body) {
+      errorMessage = body;
+    }
+    
+    if (response.status === 401) {
+      errorMessage = "Invalid credentials";
+    } else if (response.status === 403) {
+      errorMessage = "Доступ запрещен";
+    } else if (response.status === 404 && errorMessage === "Запрос не выполнен") {
+      errorMessage = "Ресурс не найден";
+    }
+    
+    throw new ApiError(errorMessage, response.status);
   }
 
   return body as T;

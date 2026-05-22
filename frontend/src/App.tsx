@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError, getReadableErrorMessage } from "./api";
 import type {
   Achievement,
   GradeView,
@@ -85,9 +85,34 @@ const statusText: Record<Achievement["status"], string> = {
 };
 
 function readableError(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
-  return "Что-то пошло не так";
+  if (error instanceof ApiError) {
+    const msg = error.message.toLowerCase();
+    
+    if (error.status === 401 || msg.includes('invalid credentials')) 
+      return 'Неверный email или пароль. Проверьте правильность ввода.';
+    
+    if (msg.includes('fetch') || msg.includes('network')) 
+      return 'Нет соединения с сервером. Проверьте интернет.';
+    
+    if (msg.includes('already exists')) 
+      return 'Пользователь с таким email уже существует.';
+    
+    if (error.status === 403) 
+      return 'Доступ запрещен. Недостаточно прав.';
+    
+    if (error.status >= 500) 
+      return 'Сервер временно недоступен. Попробуйте позже.';
+    
+    return error.message;
+  }
+  
+  if (error instanceof Error) {
+    if (error.message.includes('Failed to fetch')) 
+      return 'Ошибка сети. Проверьте соединение.';
+    return error.message;
+  }
+  
+  return 'Что-то пошло не так. Попробуйте позже.';
 }
 
 function formatDate(value: string): string {
@@ -243,7 +268,7 @@ function App() {
       setSession(null);
       showNotice("success", "Вы вышли из аккаунта");
     } catch (error) {
-      showNotice("error", readableError(error));
+      showNotice("error", getReadableErrorMessage(error));
     }
   };
 
@@ -355,22 +380,45 @@ function AuthPanel({
   const [registeredId, setRegisteredId] = useState<number | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [selectedCardType, setSelectedCardType] = useState<"teacher" | "student" | "register" | null>(null);
+  
+  // Состояния для ошибок
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const chooseMode = (nextMode: AuthMode) => {
     setMode(nextMode);
     setLogin(demoCredentials[nextMode].login);
     setPassword(demoCredentials[nextMode].password);
+    setLoginError(null); // Сбрасываем ошибку при смене режима
   };
 
   const submitLogin = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setLoginError(null);
+    
+    // Простая валидация на фронте
+    if (!login.trim()) {
+      setLoginError("Введите email");
+      setLoading(false);
+      return;
+    }
+    if (!password) {
+      setLoginError("Введите пароль");
+      setLoading(false);
+      return;
+    }
+    
     try {
       const response = await api.login(login, password);
-      onNotice("success", response.role === "teacher" ? "Вход как учитель" : "Вход как ученик");
+      onNotice("success", response.role === "teacher" ? "Вход выполнен" : "Добро пожаловать");
       onLogin(response);
     } catch (error) {
-      onNotice("error", readableError(error));
+      const errorMessage = getReadableErrorMessage(error);
+      setLoginError(errorMessage);
+      // Не показываем глобальное уведомление, т.к. ошибка уже видна в форме
     } finally {
       setLoading(false);
     }
@@ -379,6 +427,24 @@ function AuthPanel({
   const submitRegister = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setRegisterError(null);
+    
+    if (!name.trim()) {
+      setRegisterError("Введите имя");
+      setLoading(false);
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      setRegisterError("Введите корректный email");
+      setLoading(false);
+      return;
+    }
+    if (studentPassword.length < 4) {
+      setRegisterError("Пароль должен быть не менее 4 символов");
+      setLoading(false);
+      return;
+    }
+    
     try {
       const response = await api.register({
         name,
@@ -392,7 +458,7 @@ function AuthPanel({
       setMode("student");
       onNotice("success", `Ученик зарегистрирован. ID: ${response.id}`);
     } catch (error) {
-      onNotice("error", readableError(error));
+      setRegisterError(getReadableErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -400,248 +466,195 @@ function AuthPanel({
 
   const copyRegisteredId = async () => {
     if (!registeredId) return;
-
     try {
       await navigator.clipboard.writeText(String(registeredId));
-      onNotice("success", "ID ученика скопирован");
+      onNotice("success", "ID скопирован");
     } catch {
-      onNotice("error", "Не удалось скопировать ID");
+      onNotice("error", "Не удалось скопировать");
     }
   };
 
   const handleCardClick = (type: "teacher" | "student" | "register") => {
-    if (type === "teacher") {
-      chooseMode("teacher");
-    } else if (type === "student") {
-      chooseMode("student");
-    }
+    if (type === "teacher") chooseMode("teacher");
+    if (type === "student") chooseMode("student");
     setSelectedCardType(type);
     setIsFormVisible(true);
+    setLoginError(null);
+    setRegisterError(null);
   };
 
   const handleBack = () => {
     setIsFormVisible(false);
     setSelectedCardType(null);
+    setLoginError(null);
+    setRegisterError(null);
   };
 
   return (
-<div className="new-auth-wrapper">
-  <div className="new-auth-content">
-    {/* Hero секция */}
-    <div className="new-auth-hero">
-      <h1 className="new-auth-title">
-        Журнал, где достижения<br />
-        превращаются в токены
-      </h1>
-      
-      <p className="new-auth-description">
-        Учитель ведет группы, предметы, оценки и подтверждает активности.<br />
-        Ученик видит прогресс, копит AMT и тратит их на мерч.
-      </p>
-
-      <div className={`new-auth-stats ${isFormVisible ? 'stats-hidden' : ''}`}>
-        <div className="new-stat-card">
-          <div className="new-stat-value">2</div>
-          <div className="new-stat-label">Роли</div>
-          <div className="new-stat-caption">учитель и ученик</div>
-        </div>
-        <div className="new-stat-card">
-          <div className="new-stat-value">10</div>
-          <div className="new-stat-label">AMT</div>
-          <div className="new-stat-caption">за подтверждение</div>
-        </div>
-        <div className="new-stat-card">
-          <div className="new-stat-value">7</div>
-          <div className="new-stat-label">Товаров</div>
-          <div className="new-stat-caption">в магазине</div>
-        </div>
-      </div>
-    </div>
-
-    <div className="new-auth-cards-container">
-      {/* Карточки выбора роли */}
-      <div className={`auth-cards-section ${isFormVisible ? 'form-visible' : ''}`}>
-        <div className="new-auth-cards">
-          <button
-            className="new-auth-card teacher"
-            type="button"
-            onClick={() => handleCardClick("teacher")}
-          >
-            <div className="new-auth-card-icon">
-              <ClipboardCheck size={32} />
-            </div>
-            <h3>Учитель</h3>
-            <p>Вход в кабинет учителя</p>
-            <span className="new-auth-card-arrow">→</span>
-          </button>
-
-          <button
-            className="new-auth-card student"
-            type="button"
-            onClick={() => handleCardClick("student")}
-          >
-            <div className="new-auth-card-icon">
-              <User size={32} />
-            </div>
-            <h3>Ученик</h3>
-            <p>Вход в кабинет ученика</p>
-            <span className="new-auth-card-arrow">→</span>
-          </button>
-
-          <button
-            className="new-auth-card register"
-            type="button"
-            onClick={() => handleCardClick("register")}
-          >
-            <div className="new-auth-card-icon">
-              <UserPlus size={32} />
-            </div>
-            <h3>Регистрация</h3>
-            <p>Создать аккаунт ученика</p>
-            <span className="new-auth-card-arrow">→</span>
-          </button>
+    <div className="new-auth-wrapper">
+      <div className="new-auth-content">
+        <div className="new-auth-hero">
+          <h1 className="new-auth-title">
+            Журнал, где достижения<br />
+            превращаются в токены
+          </h1>
+          <p className="new-auth-description">
+            Учитель ведет группы, предметы, оценки и подтверждает активности.<br />
+            Ученик видит прогресс, копит AMT и тратит их на мерч.
+          </p>
+          <div className={`new-auth-stats ${isFormVisible ? 'stats-hidden' : ''}`}>
+            <div className="new-stat-card"><div className="new-stat-value">2</div><div className="new-stat-label">Роли</div><div className="new-stat-caption">учитель и ученик</div></div>
+            <div className="new-stat-card"><div className="new-stat-value">10</div><div className="new-stat-label">AMT</div><div className="new-stat-caption">за подтверждение</div></div>
+            <div className="new-stat-card"><div className="new-stat-value">7</div><div className="new-stat-label">Товаров</div><div className="new-stat-caption">в магазине</div></div>
+          </div>
         </div>
 
-        {/* Форма входа/регистрации */}
-        <div className={`new-auth-form-wrapper ${isFormVisible ? 'visible' : ''}`}>
-          <button 
-            className="new-auth-back-btn"
-            type="button"
-            onClick={handleBack}
-          >
-            ← Назад к выбору
-          </button>
-
-          {/* Форма входа */}
-          {selectedCardType !== "register" && (
-            <form className="new-auth-form" onSubmit={submitLogin}>
-              <div className="new-auth-form-header">
-                <div className="new-auth-form-icon">
-                  {mode === "teacher" ? <ClipboardCheck size={24} /> : <User size={24} />}
-                </div>
-                <div>
-                  <p>Вход в систему</p>
-                  <h2>{mode === "teacher" ? "Кабинет учителя" : "Кабинет ученика"}</h2>
-                </div>
-              </div>
-
-              <div className="new-auth-form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={login}
-                  onChange={(event) => setLogin(event.target.value)}
-                  placeholder="example@school.edu"
-                  autoComplete="email"
-                  required
-                />
-              </div>
-
-              <div className="new-auth-form-group">
-                <label>Пароль</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-
-              <button className="new-auth-submit-btn" type="submit" disabled={loading}>
-                {loading ? <Loader2 className="spin" size={18} /> : <LogIn size={18} />}
-                Войти
+        <div className="new-auth-cards-container">
+          <div className={`auth-cards-section ${isFormVisible ? 'form-visible' : ''}`}>
+            <div className="new-auth-cards">
+              <button className="new-auth-card teacher" type="button" onClick={() => handleCardClick("teacher")}>
+                <div className="new-auth-card-icon"><ClipboardCheck size={32} /></div>
+                <h3>Учитель</h3><p>Вход в кабинет учителя</p><span className="new-auth-card-arrow">→</span>
               </button>
-            </form>
-          )}
-
-          {/* Форма регистрации */}
-          {selectedCardType === "register" && (
-            <form className="new-auth-form" onSubmit={submitRegister}>
-              <div className="new-auth-form-header">
-                <div className="new-auth-form-icon">
-                  <UserPlus size={24} />
-                </div>
-                <div>
-                  <p>Добро пожаловать</p>
-                  <h2>Регистрация ученика</h2>
-                </div>
-              </div>
-
-              <div className="new-auth-form-group">
-                <label>Имя</label>
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Иван Петров"
-                  required
-                />
-              </div>
-
-              <div className="new-auth-form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="ivan@example.com"
-                  autoComplete="email"
-                  required
-                />
-              </div>
-
-              <div className="new-auth-form-row">
-                <div className="new-auth-form-group">
-                  <label>ID группы (опционально)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={groupId}
-                    placeholder="0"
-                    onChange={(event) => setGroupId(event.target.value)}
-                  />
-                </div>
-                <div className="new-auth-form-group">
-                  <label>Пароль</label>
-                  <input
-                    type="password"
-                    value={studentPassword}
-                    onChange={(event) => setStudentPassword(event.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button className="new-auth-submit-btn" type="submit" disabled={loading}>
-                {loading ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
-                Зарегистрироваться
+              <button className="new-auth-card student" type="button" onClick={() => handleCardClick("student")}>
+                <div className="new-auth-card-icon"><User size={32} /></div>
+                <h3>Ученик</h3><p>Вход в кабинет ученика</p><span className="new-auth-card-arrow">→</span>
               </button>
+              <button className="new-auth-card register" type="button" onClick={() => handleCardClick("register")}>
+                <div className="new-auth-card-icon"><UserPlus size={32} /></div>
+                <h3>Регистрация</h3><p>Создать аккаунт ученика</p><span className="new-auth-card-arrow">→</span>
+              </button>
+            </div>
 
-              {registeredId && (
-                <div className="new-auth-success-card">
-                  <div className="new-auth-success-icon">🎉</div>
-                  <div>
-                    <p>Ученик зарегистрирован!</p>
-                    <div className="new-auth-success-id">
-                      <strong>ID: {registeredId}</strong>
-                      <button type="button" onClick={copyRegisteredId}>
-                        <Copy size={12} />
-                        Копировать
-                      </button>
+            <div className={`new-auth-form-wrapper ${isFormVisible ? 'visible' : ''}`}>
+              <button className="new-auth-back-btn" type="button" onClick={handleBack}>← Назад к выбору</button>
+
+              {/* Форма входа */}
+              {selectedCardType !== "register" && (
+                <form className="new-auth-form" onSubmit={submitLogin} noValidate>
+                  <div className="new-auth-form-header">
+                    <div className="new-auth-form-icon">{mode === "teacher" ? <ClipboardCheck size={24} /> : <User size={24} />}</div>
+                    <div><p>Вход в систему</p><h2>{mode === "teacher" ? "Кабинет учителя" : "Кабинет ученика"}</h2></div>
+                  </div>
+
+                  <div className={`new-auth-form-group ${loginError && !emailFocused ? 'error' : ''}`}>
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={login}
+                      onChange={(e) => { setLogin(e.target.value); setLoginError(null); }}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                      placeholder="example@school.edu"
+                      autoComplete="email"
+                      required
+                    />
+                  </div>
+
+                  <div className={`new-auth-form-group ${loginError && !passwordFocused ? 'error' : ''}`}>
+                    <label>Пароль</label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); setLoginError(null); }}
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      required
+                    />
+                  </div>
+
+                  {/* Ошибка входа — прямо над кнопкой */}
+                  {loginError && (
+                    <div className="auth-error-message" role="alert">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <span>{loginError}</span>
+                    </div>
+                  )}
+
+                  <button className="new-auth-submit-btn" type="submit" disabled={loading}>
+                    {loading ? <Loader2 className="spin" size={18} /> : <LogIn size={18} />}
+                    Войти
+                  </button>
+
+                  <div className="auth-hint">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                    <span>Демо-доступ: <strong>anna.ivanova@school.edu</strong> / <strong>password</strong></span>
+                  </div>
+                </form>
+              )}
+
+              {/* Форма регистрации */}
+              {selectedCardType === "register" && (
+                <form className="new-auth-form" onSubmit={submitRegister} noValidate>
+                  <div className="new-auth-form-header">
+                    <div className="new-auth-form-icon"><UserPlus size={24} /></div>
+                    <div><p>Добро пожаловать</p><h2>Регистрация ученика</h2></div>
+                  </div>
+
+                  <div className="new-auth-form-group">
+                    <label>Имя</label>
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Иван Петров" required />
+                  </div>
+
+                  <div className="new-auth-form-group">
+                    <label>Email</label>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ivan@example.com" required />
+                  </div>
+
+                  <div className="new-auth-form-row">
+                    <div className="new-auth-form-group">
+                      <label>ID группы (опционально)</label>
+                      <input type="number" min="0" value={groupId} placeholder="0" onChange={(e) => setGroupId(e.target.value)} />
+                    </div>
+                    <div className="new-auth-form-group">
+                      <label>Пароль</label>
+                      <input type="password" value={studentPassword} onChange={(e) => setStudentPassword(e.target.value)} placeholder="минимум 4 символа" required />
                     </div>
                   </div>
-                </div>
+
+                  {registerError && (
+                    <div className="auth-error-message" role="alert">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <span>{registerError}</span>
+                    </div>
+                  )}
+
+                  <button className="new-auth-submit-btn" type="submit" disabled={loading}>
+                    {loading ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
+                    Зарегистрироваться
+                  </button>
+
+                  {registeredId && (
+                    <div className="auth-success-message">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                      <span>Ученик зарегистрирован! ID: {registeredId}</span>
+                      <button type="button" onClick={copyRegisteredId} className="copy-id-btn">
+                        <Copy size={12} /> Копировать
+                      </button>
+                    </div>
+                  )}
+                </form>
               )}
-            </form>
-          )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</div>
   );
 }
 
@@ -684,7 +697,7 @@ function StudentWorkspace({
       setPurchases(purchaseList);
       setAchievements(achievementList);
     } catch (error) {
-      onNotice("error", readableError(error));
+      onNotice("error", getReadableErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -707,7 +720,7 @@ function StudentWorkspace({
       onNotice("success", "Заявка отправлена учителю");
       await loadData();
     } catch (error) {
-      onNotice("error", readableError(error));
+      onNotice("error", getReadableErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -724,7 +737,7 @@ function StudentWorkspace({
       onNotice("success", `Покупка оформлена: ${item.title}`);
       await loadData();
     } catch (error) {
-      onNotice("error", readableError(error));
+      onNotice("error", getReadableErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -1016,7 +1029,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
         setGroupGrades([]);
       }
     } catch (error) {
-      onNotice("error", readableError(error));
+      onNotice("error", getReadableErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -1042,7 +1055,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
       const grades = await api.teacherGroupGrades(groupId);
       setGroupGrades(grades);
     } catch (error) {
-      onNotice("error", readableError(error));
+      onNotice("error", getReadableErrorMessage(error));
     }
   };
 
@@ -1146,7 +1159,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
     try {
       await action();
     } catch (error) {
-      onNotice("error", readableError(error));
+      onNotice("error", getReadableErrorMessage(error));
     } finally {
       setSaving(false);
     }
