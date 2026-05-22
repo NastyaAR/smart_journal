@@ -2058,3 +2058,288 @@ td span {
     text-align: center;
   }
 }
+
+.app-shell {
+  padding: 24px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Контейнеры на всю ширину */
+.topbar,
+.workspace,
+.notice {
+  max-width: none;
+  width: 100%;
+}
+
+/* Контент внутри workspace — по центру, но широкий */
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.role-layout {
+  flex: 1;
+}
+
+/* Hero-секция на всю ширину */
+.role-hero {
+  width: 100%;
+}
+
+/* Сетка метрик — растягиваем на всю ширину */
+.content-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+/* Метрики растягиваются */
+.metric {
+  width: 100%;
+  height: 100%;
+}
+
+/* Таблицы на всю ширину */
+.surface {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Две колонки растягиваются */
+.two-column {
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* На мобильных — одна колонка */
+@media (max-width: 768px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+  
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Блок с метриками занимает всё пространство */
+.grid-caption.full-row {
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.app-shell {
+  padding: 24px 50px !important;
+}
+
+/* 2. Контентные блоки на всю ширину */
+.workspace {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* 3. Сетка метрик — 4 колонки на широких экранах */
+@media (min-width: 1200px) {
+  .content-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 24px !important;
+  }
+}
+
+/* 4. Широкие блоки (Группы и последние оценки) */
+.content-grid .wide {
+  grid-column: span 2 !important;
+}
+
+/* 5. Отступы у поверхностей */
+.surface {
+  padding: 24px !important;
+}
+
+.content-grid .surface:has(.wallet-summary) {
+  grid-column: span 2; /* Растягиваем на 2 колонки */
+}
+
+/* Если кошелек внутри wide-блока — делаем его шире */
+.surface:has(.wallet-summary) {
+  width: 100%;
+}
+
+/* Сам компонент WalletSummary — на всю ширину */
+.wallet-summary {
+  width: 100%;
+}
+
+/* Баланс — крупный и заметный */
+.wallet-balance {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+}
+
+.wallet-balance strong {
+  font-size: 48px;
+  line-height: 1.2;
+  margin-top: 12px;
+}
+
+/* Адрес кошелька — с переносом длинной строки */
+.wallet-address {
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.wallet-address code {
+  display: block;
+  word-break: break-all;
+  white-space: normal;
+  font-size: 12px;
+  font-family: monospace;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+/* История транзакций — сетка для компактности */
+.token-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.token-event {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.token-event:hover {
+  border-color: #cbd5e1;
+  background: #fafcff;
+}
+
+.token-event div {
+  flex: 1;
+}
+
+.token-event h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.token-event p {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+.token-event strong {
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #f1f5f9;
+}
+
+.token-event strong.income {
+  color: #0f8f69;
+  background: #ddf8ec;
+}
+
+.token-event strong.expense {
+  color: #c43832;
+  background: #ffe2df;
+}
+
+/* На вкладке Кошелек — отдельная страница с большим кошельком */
+section.surface:has(.wallet-summary) {
+  max-width: none;
+  width: 100%;
+}
+
+/* Если кошелек на отдельной вкладке — делаем его центральным блоком */
+.readable:has(.wallet-summary) {
+  max-width: none;
+}
+
+/* Для вкладки Кошелек — расширенная версия */
+.wallet-full-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.wallet-full-page .wallet-balance {
+  text-align: center;
+  padding: 32px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #2866d3, #0f8f69);
+  color: white;
+}
+
+.wallet-full-page .wallet-balance span {
+  color: rgba(255,255,255,0.8);
+}
+
+.wallet-full-page .wallet-balance strong {
+  color: white;
+  font-size: 64px;
+}
+
+.wallet-full-page .wallet-address {
+  background: #f1f5f9;
+  border-radius: 16px;
+}
+
+.wallet-full-page .wallet-address code {
+  font-size: 14px;
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+/* Адаптация для мобильных */
+@media (max-width: 768px) {
+  .wallet-balance strong {
+    font-size: 36px;
+  }
+  
+  .token-event {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .token-event strong {
+    align-self: flex-start;
+  }
+  
+  .content-grid .surface:has(.wallet-summary) {
+    grid-column: span 1;
+  }
+}
+
+/* Для очень широких экранов */
+@media (min-width: 1200px) {
+  .content-grid .surface:has(.wallet-summary) {
+    grid-column: span 2;
+  }
+  
+  .wallet-balance strong {
+    font-size: 56px;
+  }
+}
