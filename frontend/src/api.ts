@@ -1,3 +1,4 @@
+
 import type {
   Achievement,
   Grade,
@@ -10,7 +11,9 @@ import type {
   PurchaseResult,
   SessionResponse,
   StudentGroupResponse,
+  StudentMeResponse,
   Subject,
+  Student,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -150,6 +153,9 @@ const requestStudentGroup = async (): Promise<StudentGroupResponse> => {
   };
 };
 
+  
+
+
 export const api = {
   health: () => request<string>("/health"),
   login: (login: string, password: string) =>
@@ -163,6 +169,8 @@ export const api = {
     group_id?: number;
   }) => post<{ message: string; id: number }>("/register", payload),
 
+
+  studentMe: () => request<StudentMeResponse>("/students/me"),
   studentGroup: requestStudentGroup,
   studentGrades: () => requestArray<GradeView>("/students/grades"),
   studentBalance: () => request<{ balance: string }>("/students/balance"),
@@ -191,6 +199,8 @@ export const api = {
     post<Grade>("/teachers/grades", payload),
   teacherGroupGrades: (groupId: number) =>
     requestArray<GradeView>(`/teachers/groups/${groupId}/grades`),
+  teacherGroupStudents: (groupId: number) =>
+    requestArray<Student>(`/teachers/groups/${groupId}/students`),
   pendingAchievements: () =>
     requestArray<Achievement>("/teachers/achievements/pending"),
   confirmAchievement: (achievement_id: number) =>
@@ -200,3 +210,8 @@ export const api = {
   awardTokens: (student_id: number, amount: number) =>
     post<MessageResponse>("/teachers/tokens/award", { student_id, amount }),
 };
+  
+ 
+
+
+

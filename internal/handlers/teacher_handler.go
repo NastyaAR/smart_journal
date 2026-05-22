@@ -266,6 +266,28 @@ func (h *TeacherHandler) SetGrade(c *fiber.Ctx) error {
 	return c.Status(http.StatusCreated).JSON(grade)
 }
 
+func (h *TeacherHandler) GetStudentsForGroup(c *fiber.Ctx) error {
+	groupID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid group ID"})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	teacher, err := h.currentTeacher(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	students, err := h.teacherService.GetStudentsByGroupID(ctx, teacher.ID, groupID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(students)
+}
+
 func (h *TeacherHandler) GetGradesForGroup(c *fiber.Ctx) error {
 	groupID, err := c.ParamsInt("id")
 	if err != nil {

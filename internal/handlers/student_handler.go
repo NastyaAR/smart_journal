@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -59,6 +60,27 @@ func (h *StudentHandler) currentStudent(c *fiber.Ctx, ctx context.Context) (*mod
 	}
 
 	return h.studentService.GetStudentByUserID(ctx, userID)
+}
+
+func (h *StudentHandler) GetMe(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	student, err := h.currentStudent(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	walletAddress := fmt.Sprintf("0x%040d", student.ID)
+
+	return c.JSON(fiber.Map{
+		"student_id":     student.ID,
+		"name":           student.Name,
+		"email":          student.Email,
+		"group_id":       student.GroupID,
+		"tokens":         student.Tokens,
+		"wallet_address": walletAddress,
+	})
 }
 
 func (h *StudentHandler) Register(c *fiber.Ctx) error {

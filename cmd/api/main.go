@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,16 +15,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	fmt.Println(os.Getenv("DATABASE_URL"))
-
 	app := fiber.New(fiber.Config{
 		AppName:      "Smart Journal API",
 		ServerHeader: "Fiber",
@@ -38,7 +30,7 @@ func main() {
 
 	connString := os.Getenv("DATABASE_URL")
 	if connString == "" {
-		connString = os.Getenv("DATABASE_URL")
+		connString = "postgres://admin:password@0.0.0.0:5432/smartjournal?sslmode=disable"
 	}
 	postgresRepo, err := repositories.NewPostgresRepository(ctx, connString)
 	if err != nil {
@@ -125,6 +117,7 @@ func setupRoutes(
 	teachers.Get("/groups", teacherHandler.GetGroups)
 	teachers.Post("/groups", teacherHandler.CreateGroup)
 	teachers.Post("/groups/attach", teacherHandler.AttachGroup)
+	teachers.Get("/groups/:id/students", teacherHandler.GetStudentsForGroup)
 	teachers.Get("/groups/:id/grades", teacherHandler.GetGradesForGroup)
 	teachers.Post("/subjects", teacherHandler.CreateSubject)
 	teachers.Post("/subjects/attach", teacherHandler.AttachSubject)
@@ -135,6 +128,7 @@ func setupRoutes(
 	app.Post("/register", studentHandler.Register)
 
 	students := app.Group("/students", studentHandler.RequireAuth)
+	students.Get("/me", studentHandler.GetMe)
 	students.Post("/achievements", studentHandler.CreateAchievement)
 	students.Get("/achievements", studentHandler.GetAchievements)
 	students.Get("/grades", studentHandler.GetGrades)

@@ -86,3 +86,12 @@ export interface StudentGroupResponse {
   group: Group | null;
   students: Student[];
 }
+
+export interface StudentMeResponse {
+  student_id: number;
+  name: string;
+  email: string;
+  group_id: number;
+  tokens: number;
+  wallet_address: string;
+}

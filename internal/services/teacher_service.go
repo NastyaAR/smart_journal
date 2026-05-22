@@ -206,6 +206,13 @@ func (s *TeacherService) AttachSubject(ctx context.Context, teacherID, subjectID
 	return s.repo.AssignSubject(ctx, teacherID, subjectID)
 }
 
+func (s *TeacherService) GetStudentsByGroupID(ctx context.Context, teacherID, groupID int) ([]*models.Student, error) {
+	if err := s.requireGroupAccess(ctx, teacherID, groupID); err != nil {
+		return nil, err
+	}
+	return s.studentRepo.GetStudentsByGroupID(ctx, groupID)
+}
+
 func (s *TeacherService) GetGradeViewsByGroupID(ctx context.Context, teacherID, groupID int) ([]*models.GradeView, error) {
 	if _, err := s.groupRepo.GetGroupByID(ctx, groupID); err != nil {
 		return nil, err
