@@ -353,6 +353,8 @@ function AuthPanel({
   const [groupId, setGroupId] = useState("");
   const [loading, setLoading] = useState(false);
   const [registeredId, setRegisteredId] = useState<number | null>(null);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [selectedCardType, setSelectedCardType] = useState<"teacher" | "student" | "register" | null>(null);
 
   const chooseMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -407,150 +409,239 @@ function AuthPanel({
     }
   };
 
+  const handleCardClick = (type: "teacher" | "student" | "register") => {
+    if (type === "teacher") {
+      chooseMode("teacher");
+    } else if (type === "student") {
+      chooseMode("student");
+    }
+    setSelectedCardType(type);
+    setIsFormVisible(true);
+  };
+
+  const handleBack = () => {
+    setIsFormVisible(false);
+    setSelectedCardType(null);
+  };
+
   return (
-    <section className="auth-layout">
-      <div className="auth-copy">
-        <div className="eyebrow">
-          <BadgeCheck size={16} aria-hidden="true" />
-          Smart Journal AMT
+<div className="new-auth-wrapper">
+  <div className="new-auth-content">
+    {/* Hero секция */}
+    <div className="new-auth-hero">
+      <h1 className="new-auth-title">
+        Журнал, где достижения<br />
+        превращаются в токены
+      </h1>
+      
+      <p className="new-auth-description">
+        Учитель ведет группы, предметы, оценки и подтверждает активности.<br />
+        Ученик видит прогресс, копит AMT и тратит их на мерч.
+      </p>
+
+      <div className={`new-auth-stats ${isFormVisible ? 'stats-hidden' : ''}`}>
+        <div className="new-stat-card">
+          <div className="new-stat-value">2</div>
+          <div className="new-stat-label">Роли</div>
+          <div className="new-stat-caption">учитель и ученик</div>
         </div>
-        <h1>Журнал, где достижения превращаются в токены</h1>
-        <p>
-          Учитель ведет группы, предметы, оценки и подтверждает активности.
-          Ученик видит прогресс, копит AMT и тратит их на мерч.
-        </p>
-        <div className="auth-metrics">
-          <MetricCard label="Роли" value="2" caption="учитель и ученик" />
-          <MetricCard label="Награда" value="10 AMT" caption="за подтверждение" />
-          <MetricCard label="Магазин" value="7" caption="товаров в seed" />
+        <div className="new-stat-card">
+          <div className="new-stat-value">10</div>
+          <div className="new-stat-label">AMT</div>
+          <div className="new-stat-caption">за подтверждение</div>
+        </div>
+        <div className="new-stat-card">
+          <div className="new-stat-value">7</div>
+          <div className="new-stat-label">Товаров</div>
+          <div className="new-stat-caption">в магазине</div>
         </div>
       </div>
+    </div>
 
-      <div className="auth-forms">
-        <form className="surface auth-form" onSubmit={submitLogin}>
-          <div className="section-heading">
-            <div>
-              <p>Вход</p>
-              <h2>{mode === "teacher" ? "Кабинет учителя" : "Кабинет ученика"}</h2>
+    <div className="new-auth-cards-container">
+      {/* Карточки выбора роли */}
+      <div className={`auth-cards-section ${isFormVisible ? 'form-visible' : ''}`}>
+        <div className="new-auth-cards">
+          <button
+            className="new-auth-card teacher"
+            type="button"
+            onClick={() => handleCardClick("teacher")}
+          >
+            <div className="new-auth-card-icon">
+              <ClipboardCheck size={32} />
             </div>
-            {mode === "teacher" ? (
-              <ClipboardCheck size={22} aria-hidden="true" />
-            ) : (
-              <User size={22} aria-hidden="true" />
-            )}
-          </div>
-
-          <div className="segmented" aria-label="Выбор роли для входа">
-            <button
-              type="button"
-              className={mode === "teacher" ? "active" : ""}
-              onClick={() => chooseMode("teacher")}
-            >
-              <ClipboardCheck size={16} aria-hidden="true" />
-              Учитель
-            </button>
-            <button
-              type="button"
-              className={mode === "student" ? "active" : ""}
-              onClick={() => chooseMode("student")}
-            >
-              <User size={16} aria-hidden="true" />
-              Ученик
-            </button>
-          </div>
-
-          <label>
-            Email
-            <input
-              type="email"
-              value={login}
-              onChange={(event) => setLogin(event.target.value)}
-              autoComplete="email"
-              required
-            />
-          </label>
-          <label>
-            Пароль
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-              required
-            />
-          </label>
-          <button className="primary-button" type="submit" title="Войти" disabled={loading}>
-            {loading ? <Loader2 className="spin" size={18} /> : <LogIn size={18} />}
-            Войти
+            <h3>Учитель</h3>
+            <p>Вход в кабинет учителя</p>
+            <span className="new-auth-card-arrow">→</span>
           </button>
-          <p className="helper-text muted">
-            Демо: {mode === "teacher" ? "учитель" : "ученик"} / password
-          </p>
-        </form>
 
-        <form className="surface auth-form" onSubmit={submitRegister}>
-          <div className="section-heading">
-            <div>
-              <p>Регистрация</p>
-              <h2>Новый ученик</h2>
+          <button
+            className="new-auth-card student"
+            type="button"
+            onClick={() => handleCardClick("student")}
+          >
+            <div className="new-auth-card-icon">
+              <User size={32} />
             </div>
-            <UserPlus size={22} aria-hidden="true" />
-          </div>
-
-          <label>
-            Имя
-            <input value={name} onChange={(event) => setName(event.target.value)} required />
-          </label>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              required
-            />
-          </label>
-          <div className="form-grid">
-            <label>
-              Группа ID
-              <input
-                type="number"
-                min="0"
-                value={groupId}
-                placeholder="0"
-                onChange={(event) => setGroupId(event.target.value)}
-              />
-            </label>
-            <label>
-              Пароль
-              <input
-                type="password"
-                value={studentPassword}
-                onChange={(event) => setStudentPassword(event.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </label>
-          </div>
-          <button className="secondary-button" type="submit" title="Зарегистрировать ученика" disabled={loading}>
-            {loading ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
-            Зарегистрировать
+            <h3>Ученик</h3>
+            <p>Вход в кабинет ученика</p>
+            <span className="new-auth-card-arrow">→</span>
           </button>
-          {registeredId && (
-            <div className="registration-result">
-              <p>
-                ID ученика: <strong>{registeredId}</strong>
-              </p>
-              <button className="secondary-button small" type="button" onClick={copyRegisteredId}>
-                <Copy size={16} aria-hidden="true" />
-                Скопировать ID
+
+          <button
+            className="new-auth-card register"
+            type="button"
+            onClick={() => handleCardClick("register")}
+          >
+            <div className="new-auth-card-icon">
+              <UserPlus size={32} />
+            </div>
+            <h3>Регистрация</h3>
+            <p>Создать аккаунт ученика</p>
+            <span className="new-auth-card-arrow">→</span>
+          </button>
+        </div>
+
+        {/* Форма входа/регистрации */}
+        <div className={`new-auth-form-wrapper ${isFormVisible ? 'visible' : ''}`}>
+          <button 
+            className="new-auth-back-btn"
+            type="button"
+            onClick={handleBack}
+          >
+            ← Назад к выбору
+          </button>
+
+          {/* Форма входа */}
+          {selectedCardType !== "register" && (
+            <form className="new-auth-form" onSubmit={submitLogin}>
+              <div className="new-auth-form-header">
+                <div className="new-auth-form-icon">
+                  {mode === "teacher" ? <ClipboardCheck size={24} /> : <User size={24} />}
+                </div>
+                <div>
+                  <p>Вход в систему</p>
+                  <h2>{mode === "teacher" ? "Кабинет учителя" : "Кабинет ученика"}</h2>
+                </div>
+              </div>
+
+              <div className="new-auth-form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={login}
+                  onChange={(event) => setLogin(event.target.value)}
+                  placeholder="example@school.edu"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              <div className="new-auth-form-group">
+                <label>Пароль</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+
+              <button className="new-auth-submit-btn" type="submit" disabled={loading}>
+                {loading ? <Loader2 className="spin" size={18} /> : <LogIn size={18} />}
+                Войти
               </button>
-            </div>
+            </form>
           )}
-        </form>
+
+          {/* Форма регистрации */}
+          {selectedCardType === "register" && (
+            <form className="new-auth-form" onSubmit={submitRegister}>
+              <div className="new-auth-form-header">
+                <div className="new-auth-form-icon">
+                  <UserPlus size={24} />
+                </div>
+                <div>
+                  <p>Добро пожаловать</p>
+                  <h2>Регистрация ученика</h2>
+                </div>
+              </div>
+
+              <div className="new-auth-form-group">
+                <label>Имя</label>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Иван Петров"
+                  required
+                />
+              </div>
+
+              <div className="new-auth-form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="ivan@example.com"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              <div className="new-auth-form-row">
+                <div className="new-auth-form-group">
+                  <label>ID группы (опционально)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={groupId}
+                    placeholder="0"
+                    onChange={(event) => setGroupId(event.target.value)}
+                  />
+                </div>
+                <div className="new-auth-form-group">
+                  <label>Пароль</label>
+                  <input
+                    type="password"
+                    value={studentPassword}
+                    onChange={(event) => setStudentPassword(event.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button className="new-auth-submit-btn" type="submit" disabled={loading}>
+                {loading ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
+                Зарегистрироваться
+              </button>
+
+              {registeredId && (
+                <div className="new-auth-success-card">
+                  <div className="new-auth-success-icon">🎉</div>
+                  <div>
+                    <p>Ученик зарегистрирован!</p>
+                    <div className="new-auth-success-id">
+                      <strong>ID: {registeredId}</strong>
+                      <button type="button" onClick={copyRegisteredId}>
+                        <Copy size={12} />
+                        Копировать
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </form>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
+  </div>
+</div>
   );
 }
 
@@ -658,7 +749,7 @@ function StudentWorkspace({
   return (
     <div className="role-layout">
       <RoleHero
-        icon={<Wallet size={30} />}
+        icon={<Wallet size={28} />}
         eyebrow="Кабинет ученика"
         title="Мой прогресс и AMT"
         text="Оценки, активности, баланс токенов и покупки в одном рабочем пространстве."
@@ -709,7 +800,7 @@ function StudentWorkspace({
                     <p>{currentStudent?.name || "Профиль ученика"}</p>
                     <h2>{groupData?.group?.name || "Группа не назначена"}</h2>
                   </div>
-                  <Users size={22} aria-hidden="true" />
+                  <Users size={20} aria-hidden="true" />
                 </div>
                 <PeopleList students={classmates} currentStudentId={currentStudentId} />
               </section>
@@ -720,7 +811,7 @@ function StudentWorkspace({
                     <p>AMT</p>
                     <h2>Кошелек</h2>
                   </div>
-                  <Wallet size={22} aria-hidden="true" />
+                  <Wallet size={20} aria-hidden="true" />
                 </div>
                 <WalletSummary
                   balance={balance}
@@ -738,7 +829,7 @@ function StudentWorkspace({
                   <p>AMT</p>
                   <h2>Блокчейн-кошелек</h2>
                 </div>
-                <Wallet size={22} aria-hidden="true" />
+                <Wallet size={20} aria-hidden="true" />
               </div>
               <WalletSummary
                 balance={balance}
@@ -755,7 +846,7 @@ function StudentWorkspace({
                   <p>Личный журнал</p>
                   <h2>Мой журнал успеваемости</h2>
                 </div>
-                <BookOpen size={22} aria-hidden="true" />
+                <BookOpen size={20} aria-hidden="true" />
               </div>
               <div className="toolbar filter-toolbar">
                 <select
@@ -783,7 +874,7 @@ function StudentWorkspace({
                     <p>Новая заявка</p>
                     <h2>Активность</h2>
                   </div>
-                  <Plus size={22} aria-hidden="true" />
+                  <Plus size={20} aria-hidden="true" />
                 </div>
                 <label>
                   Название
@@ -815,7 +906,7 @@ function StudentWorkspace({
                     <p>История</p>
                     <h2>Мои активности</h2>
                   </div>
-                  <Medal size={22} aria-hidden="true" />
+                  <Medal size={20} aria-hidden="true" />
                 </div>
                 <AchievementList achievements={achievements} />
               </section>
@@ -829,7 +920,7 @@ function StudentWorkspace({
                   <p>Баланс: {balance} AMT</p>
                   <h2>Маркет мерча</h2>
                 </div>
-                <ShoppingBag size={22} aria-hidden="true" />
+                <ShoppingBag size={20} aria-hidden="true" />
               </div>
               {merch.length ? (
                 <div className="item-grid">
@@ -851,7 +942,7 @@ function StudentWorkspace({
                           disabled={saving || balance < item.price}
                           onClick={() => buyMerch(item)}
                         >
-                          <ShoppingBag size={16} aria-hidden="true" />
+                          <ShoppingBag size={14} aria-hidden="true" />
                           Купить
                         </button>
                       </div>
@@ -871,7 +962,7 @@ function StudentWorkspace({
                   <p>История</p>
                   <h2>Покупки мерча</h2>
                 </div>
-                <ListChecks size={22} aria-hidden="true" />
+                <ListChecks size={20} aria-hidden="true" />
               </div>
               <PurchasesTable purchases={purchases} />
             </section>
@@ -1089,7 +1180,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
   return (
     <div className="role-layout">
       <RoleHero
-        icon={<ClipboardCheck size={30} />}
+        icon={<ClipboardCheck size={28} />}
         eyebrow="Кабинет учителя"
         title="Группы, оценки и AMT-награды"
         text="Рабочее место для ведения учебного журнала и подтверждения достижений студентов."
@@ -1139,7 +1230,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>Группы</p>
                     <h2>Мои учебные потоки</h2>
                   </div>
-                  <Users size={22} aria-hidden="true" />
+                  <Users size={20} aria-hidden="true" />
                 </div>
                 <GroupList
                   groups={groups}
@@ -1154,7 +1245,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>{selectedGroup?.name || "Группа не выбрана"}</p>
                     <h2>Последние оценки</h2>
                   </div>
-                  <BookOpen size={22} aria-hidden="true" />
+                  <BookOpen size={20} aria-hidden="true" />
                 </div>
                 <GradeTable grades={groupGrades.slice(0, 5)} compact />
               </section>
@@ -1169,7 +1260,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>Управление</p>
                     <h2>Группы и предметы</h2>
                   </div>
-                  <School size={22} aria-hidden="true" />
+                  <School size={20} aria-hidden="true" />
                 </div>
 
                 <form className="inline-form" onSubmit={handleCreateGroup}>
@@ -1178,7 +1269,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <input value={newGroup} onChange={(event) => setNewGroup(event.target.value)} required />
                   </label>
                   <button className="primary-button" type="submit" title="Создать группу" disabled={saving}>
-                    <Plus size={18} aria-hidden="true" />
+                    <Plus size={16} aria-hidden="true" />
                     Создать
                   </button>
                 </form>
@@ -1189,7 +1280,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <input value={newSubject} onChange={(event) => setNewSubject(event.target.value)} required />
                   </label>
                   <button className="primary-button" type="submit" title="Создать предмет" disabled={saving}>
-                    <Plus size={18} aria-hidden="true" />
+                    <Plus size={16} aria-hidden="true" />
                     Создать
                   </button>
                 </form>
@@ -1208,7 +1299,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                       />
                     </label>
                     <button className="secondary-button" type="submit" title="Привязать группу" disabled={saving}>
-                      <Check size={18} aria-hidden="true" />
+                      <Check size={16} aria-hidden="true" />
                       Привязать группу
                     </button>
                   </form>
@@ -1225,7 +1316,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                       />
                     </label>
                     <button className="secondary-button" type="submit" title="Привязать предмет" disabled={saving}>
-                      <Check size={18} aria-hidden="true" />
+                      <Check size={16} aria-hidden="true" />
                       Привязать предмет
                     </button>
                   </form>
@@ -1238,7 +1329,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>Студенты</p>
                     <h2>Добавить в группу</h2>
                   </div>
-                  <Users size={22} aria-hidden="true" />
+                  <Users size={20} aria-hidden="true" />
                 </div>
                 <form className="form-stack" onSubmit={handleAddStudent}>
                   <label>
@@ -1270,7 +1361,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     </select>
                   </label>
                   <button className="primary-button" type="submit" title="Добавить ученика" disabled={saving}>
-                    <UserPlus size={18} aria-hidden="true" />
+                    <UserPlus size={16} aria-hidden="true" />
                     Добавить
                   </button>
                 </form>
@@ -1297,7 +1388,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>{selectedGroup?.name || "Группа не выбрана"}</p>
                     <h2>Журнал оценок</h2>
                   </div>
-                  <BookOpen size={22} aria-hidden="true" />
+                  <BookOpen size={20} aria-hidden="true" />
                 </div>
                 <div className="toolbar">
                   <select
@@ -1343,7 +1434,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>Новая оценка</p>
                     <h2>Выставление</h2>
                   </div>
-                  <Plus size={22} aria-hidden="true" />
+                  <Plus size={20} aria-hidden="true" />
                 </div>
                 <label>
                   ID ученика
@@ -1395,7 +1486,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                   </select>
                 </label>
                 <button className="primary-button" type="submit" title="Поставить оценку" disabled={saving}>
-                  <Check size={18} aria-hidden="true" />
+                  <Check size={16} aria-hidden="true" />
                   Поставить
                 </button>
               </form>
@@ -1409,7 +1500,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                   <p>Подтверждение</p>
                   <h2>Заявки на активности</h2>
                 </div>
-                <Medal size={22} aria-hidden="true" />
+                <Medal size={20} aria-hidden="true" />
               </div>
               <div className="toolbar filter-toolbar">
                 <input
@@ -1434,7 +1525,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>AMT</p>
                     <h2>Ручное начисление</h2>
                   </div>
-                  <Coins size={22} aria-hidden="true" />
+                  <Coins size={20} aria-hidden="true" />
                 </div>
                 <div className="toolbar filter-toolbar">
                   <select
@@ -1470,7 +1561,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     />
                   </label>
                   <button className="primary-button" type="submit" title="Начислить токены" disabled={saving}>
-                    <Coins size={18} aria-hidden="true" />
+                    <Coins size={16} aria-hidden="true" />
                     Начислить
                   </button>
                 </form>
@@ -1482,7 +1573,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     <p>{selectedGroup?.name || "Группа не выбрана"}</p>
                     <h2>ID из журнала</h2>
                   </div>
-                  <Users size={22} aria-hidden="true" />
+                  <Users size={20} aria-hidden="true" />
                 </div>
                 <StudentShortcutList
                   students={knownStudents}
@@ -1584,7 +1675,7 @@ function PendingGroupState({
   return (
     <section className="surface pending-state">
       <div className="pending-icon">
-        <School size={28} aria-hidden="true" />
+        <School size={26} aria-hidden="true" />
       </div>
       <div>
         <p>Профиль ожидает группу</p>
@@ -1608,7 +1699,7 @@ function PendingGroupState({
         </span>
       </div>
       <button className="primary-button" type="button" onClick={onRefresh}>
-        <RefreshCw size={18} aria-hidden="true" />
+        <RefreshCw size={16} aria-hidden="true" />
         Проверить снова
       </button>
     </section>
@@ -1749,7 +1840,7 @@ function StudentShortcutList({
     <div className="shortcut-list">
       {students.map((student) => (
         <button key={student.id} type="button" onClick={() => onPick(student.id)}>
-          <User size={16} aria-hidden="true" />
+          <User size={14} aria-hidden="true" />
           <span>{student.name}</span>
           <strong>ID {student.id}</strong>
         </button>
@@ -1860,7 +1951,7 @@ function SubjectList({ subjects }: { subjects: string[] }) {
     <div className="subject-list">
       {subjects.map((subject) => (
         <span key={subject}>
-          <BookOpen size={15} aria-hidden="true" />
+          <BookOpen size={14} aria-hidden="true" />
           {subject}
         </span>
       ))}
@@ -1898,7 +1989,7 @@ function TeacherAchievementQueue({
               disabled={saving}
               onClick={() => onAction(achievement.id, "confirm")}
             >
-              <Check size={17} aria-hidden="true" />
+              <Check size={16} aria-hidden="true" />
             </button>
             <button
               className="icon-action deny"
@@ -1907,7 +1998,7 @@ function TeacherAchievementQueue({
               disabled={saving}
               onClick={() => onAction(achievement.id, "deny")}
             >
-              <X size={17} aria-hidden="true" />
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
         </article>
@@ -1971,7 +2062,7 @@ function GroupList({
           title="Выбрать группу"
           onClick={() => onSelect(group.id)}
         >
-          <School size={18} aria-hidden="true" />
+          <School size={16} aria-hidden="true" />
           <span>{group.name}</span>
           <small>ID {group.id}</small>
         </button>
@@ -1983,7 +2074,7 @@ function GroupList({
 function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className="empty-state">
-      <ClipboardCheck size={22} aria-hidden="true" />
+      <BadgeCheck size={20} aria-hidden="true" />
       <strong>{title}</strong>
       <p>{text}</p>
     </div>
