@@ -15,9 +15,9 @@ services:
       - "-c"
       - "pg_stat_statements.track=all"
     environment:
-      POSTGRES_DB: ${PSQL_DB}
-      POSTGRES_USER: ${PSQL_USER}
-      POSTGRES_PASSWORD: ${PSQL_PASSWORD}
+      POSTGRES_DB: ${PSQL_DB:-smartjournal}
+      POSTGRES_USER: ${PSQL_USER:-admin}
+      POSTGRES_PASSWORD: ${PSQL_PASSWORD:-password}
       PGDATA: "/var/lib/postgresql/data/pgdata"
     volumes:
       - ./postgres:/var/lib/postgresql/data
@@ -44,13 +44,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PSQL_DB: ${PSQL_DB}
-      PSQL_USER: ${PSQL_USER}
-      PSQL_PASSWORD: ${PSQL_PASSWORD}
+      PSQL_DB: ${PSQL_DB:-smartjournal}
+      PSQL_USER: ${PSQL_USER:-admin}
+      PSQL_PASSWORD: ${PSQL_PASSWORD:-password}
       PSQL_PORT: ${PSQL_PORT:-5432}
       PSQL_HOST: ${PSQL_HOST:-postgres}
       GOOSE_DRIVER: postgres
-      GOOSE_DBSTRING: postgres://${PSQL_USER}:${PSQL_PASSWORD}@${PSQL_HOST:-postgres}:${PSQL_PORT:-5432}/${PSQL_DB}?sslmode=disable
+      GOOSE_DBSTRING: postgres://${PSQL_USER:-admin}:${PSQL_PASSWORD:-password}@${PSQL_HOST:-postgres}:${PSQL_PORT:-5432}/${PSQL_DB:-smartjournal}?sslmode=disable
     volumes:
       - ./migrations:/migrations
     networks:

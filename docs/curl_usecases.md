@@ -227,7 +227,22 @@ curl -i -b "$STUDENT_COOKIES" \
 curl -b "$STUDENT_COOKIES" "$BASE_URL/students/achievements"
 ```
 
-### 11. Выйти
+### 11. Получить и сохранить AI-рекомендации по текущим оценкам
+
+API соберет оценки текущего ученика из БД, отправит их в `AI_SERVICE_URL/get_recommendations` и сохранит ответ.
+
+```bash
+curl -i -X POST -b "$STUDENT_COOKIES" \
+  "$BASE_URL/students/recommendations"
+```
+
+Прочитать последнюю сохраненную рекомендацию:
+
+```bash
+curl -b "$STUDENT_COOKIES" "$BASE_URL/students/recommendations"
+```
+
+### 12. Выйти
 
 ```bash
 curl -i -b "$STUDENT_COOKIES" -c "$STUDENT_COOKIES" \

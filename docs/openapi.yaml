@@ -289,6 +289,46 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /students/recommendations:
+    post:
+      tags: [Students]
+      summary: Получить и сохранить AI-рекомендации по текущим оценкам ученика
+      responses:
+        "201":
+          description: Рекомендации получены от AI-сервиса и сохранены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoredRecommendation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          description: AI-сервис недоступен или вернул ошибку
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Students]
+      summary: Последняя сохраненная AI-рекомендация текущего ученика
+      responses:
+        "200":
+          description: Последняя рекомендация
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoredRecommendation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /teachers/groups:
     get:
       tags: [Teachers]
@@ -810,6 +850,67 @@ components:
           minimum: 1
           maximum: 5
           example: 5
+
+    SubjectRecommendation:
+      type: object
+      properties:
+        subject:
+          type: string
+          example: Математика
+        score:
+          type: integer
+          example: 100
+        recommendation:
+          type: string
+          example: Продолжайте уделять внимание развитию навыков решения математических задач.
+
+    AIRecommendation:
+      type: object
+      properties:
+        student_id:
+          type: string
+          example: "1"
+        student_name:
+          type: string
+          example: Иван
+        student_surname:
+          type: string
+          example: Петров
+        strengths:
+          type: array
+          items:
+            type: string
+          example:
+            - Хорошая успеваемость в Математике
+        weaknesses:
+          type: array
+          items:
+            type: string
+          example:
+            - Низкая успеваемость в Физике
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubjectRecommendation"
+        general_advice:
+          type: string
+          example: Продолжайте работать над улучшением своих результатов.
+
+    StoredRecommendation:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_id:
+          type: integer
+          example: 1
+        payload:
+          $ref: "#/components/schemas/AIRecommendation"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-20T12:00:00Z"
 
     AddStudentToGroupRequest:
       type: object

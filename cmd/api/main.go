@@ -64,12 +64,13 @@ func main() {
 	gradeRepo := repositories.NewGradeRepository(postgresRepo)
 	achievementRepo := repositories.NewAchievementRepository(postgresRepo)
 	merchRepo := repositories.NewMerchRepository(postgresRepo)
+	recommendationRepo := repositories.NewRecommendationRepository(postgresRepo)
 	userRepository := repositories.NewUserRepository(postgresRepo)
 
 	studentService := services.NewStudentService(studentRepo, achievementRepo, userRepository, contractAdapter)
 	teacherService := services.NewTeacherService(teacherRepo, achievementRepo, studentService, groupRepo, subjectRepo, gradeRepo, studentRepo, userRepository)
 
-	aiservice := services.NewAIService()
+	aiService := services.NewAIService(os.Getenv("AI_SERVICE_URL"))
 
 	authHandler := handlers.NewAuthHandler(services.NewAuthService(userRepository))
 	studentHandler := handlers.NewStudentHandler(
@@ -79,11 +80,13 @@ func main() {
 		groupRepo,
 		subjectRepo,
 		merchRepo,
+		recommendationRepo,
+		aiService,
 		authHandler,
 	)
 	teacherHandler := handlers.NewTeacherHandler(teacherService, authHandler)
 
-	setupRoutes(app, teacherRepo, studentRepo, groupRepo, subjectRepo, gradeRepo, achievementRepo, merchRepo, studentService, aiservice, authHandler, teacherHandler, studentHandler)
+	setupRoutes(app, teacherRepo, studentRepo, groupRepo, subjectRepo, gradeRepo, achievementRepo, merchRepo, studentService, authHandler, teacherHandler, studentHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -106,7 +109,6 @@ func setupRoutes(
 	achievementRepo *repositories.AchievementRepository,
 	merchRepo *repositories.MerchRepository,
 	studentService *services.StudentService,
-	aiService *services.AIService,
 	authHandler *handlers.AuthHandler,
 	teacherHandler *handlers.TeacherHandler,
 	studentHandler *handlers.StudentHandler,
@@ -148,4 +150,6 @@ func setupRoutes(
 	students.Get("/merch", studentHandler.GetMerch)
 	students.Post("/merch/buy", studentHandler.BuyMerch)
 	students.Get("/purchases", studentHandler.GetPurchases)
+	students.Post("/recommendations", studentHandler.GenerateRecommendations)
+	students.Get("/recommendations", studentHandler.GetLatestRecommendation)
 }
