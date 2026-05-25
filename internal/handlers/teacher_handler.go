@@ -220,6 +220,23 @@ func (h *TeacherHandler) AttachSubject(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Subject attached successfully"})
 }
 
+func (h *TeacherHandler) GetSubjects(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	teacher, err := h.currentTeacher(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	subjects, err := h.teacherService.GetSubjects(ctx, teacher.ID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(subjects)
+}
+
 func (h *TeacherHandler) AddStudentToGroup(c *fiber.Ctx) error {
 	var req struct {
 		StudentID int `json:"student_id"`

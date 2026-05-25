@@ -7,6 +7,7 @@ import type {
   LoginResponse,
   Merch,
   MessageResponse,
+  PendingAchievementView,
   Purchase,
   PurchaseResult,
   SessionResponse,
@@ -188,6 +189,7 @@ export const api = {
     post<MessageResponse>("/teachers/groups/attach", { group_id }),
   createSubject: (name: string) =>
     post<Subject>("/teachers/subjects", { name }),
+  teacherSubjects: () => requestArray<Subject>("/teachers/subjects"),
   attachSubject: (subject_id: number) =>
     post<MessageResponse>("/teachers/subjects/attach", { subject_id }),
   addStudentToGroup: (student_id: number, group_id: number) =>
@@ -202,7 +204,7 @@ export const api = {
   teacherGroupStudents: (groupId: number) =>
     requestArray<Student>(`/teachers/groups/${groupId}/students`),
   pendingAchievements: () =>
-    requestArray<Achievement>("/teachers/achievements/pending"),
+    requestArray<PendingAchievementView>("/teachers/achievements/pending"),
   confirmAchievement: (achievement_id: number) =>
     post<MessageResponse>("/teachers/achievements/confirm", { achievement_id }),
   denyAchievement: (achievement_id: number) =>

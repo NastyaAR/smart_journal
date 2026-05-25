@@ -180,7 +180,7 @@ func (s *TeacherService) DenyAchievement(ctx context.Context, achievementID, tea
 	return s.achievementRepo.DenyAchievement(ctx, achievementID, teacherID)
 }
 
-func (s *TeacherService) GetPendingAchievements(ctx context.Context, teacherID int) ([]*models.Achievement, error) {
+func (s *TeacherService) GetPendingAchievements(ctx context.Context, teacherID int) ([]*models.PendingAchievementView, error) {
 	return s.achievementRepo.GetPendingAchievements(ctx, teacherID)
 }
 
@@ -204,6 +204,10 @@ func (s *TeacherService) AttachSubject(ctx context.Context, teacherID, subjectID
 		return err
 	}
 	return s.repo.AssignSubject(ctx, teacherID, subjectID)
+}
+
+func (s *TeacherService) GetSubjects(ctx context.Context, teacherID int) ([]*models.Subject, error) {
+	return s.subjectRepo.GetSubjectsByTeacherID(ctx, teacherID)
 }
 
 func (s *TeacherService) GetStudentsByGroupID(ctx context.Context, teacherID, groupID int) ([]*models.Student, error) {

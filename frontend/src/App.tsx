@@ -29,6 +29,7 @@ import type {
   Group,
   LoginResponse,
   Merch,
+  PendingAchievementView,
   Purchase,
   Role,
   SessionResponse,
@@ -207,7 +208,9 @@ function filterGrades(
   });
 }
 
-function filterAchievements(achievements: Achievement[], query: string): Achievement[] {
+function filterAchievements(achievements: Achievement[], query: string): Achievement[];
+function filterAchievements(achievements: PendingAchievementView[], query: string): PendingAchievementView[];
+function filterAchievements(achievements: (Achievement | PendingAchievementView)[], query: string): (Achievement | PendingAchievementView)[] {
   const value = query.trim().toLowerCase();
   if (!value) return achievements;
 
@@ -216,6 +219,8 @@ function filterAchievements(achievements: Achievement[], query: string): Achieve
       String(achievement.student_id),
       achievement.title,
       achievement.description || "",
+      "student_name" in achievement ? achievement.student_name : "",
+      "group_name" in achievement ? achievement.group_name : "",
     ]
       .join(" ")
       .toLowerCase();
@@ -989,7 +994,7 @@ function StudentWorkspace({
 function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: string) => void }) {
   const [tab, setTab] = useState<TeacherTab>("overview");
   const [groups, setGroups] = useState<Group[]>([]);
-  const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
+  const [pendingAchievements, setPendingAchievements] = useState<PendingAchievementView[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupGrades, setGroupGrades] = useState<GradeView[]>([]);
   const [createdSubjects, setCreatedSubjects] = useState<Subject[]>([]);
@@ -1014,12 +1019,14 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
   const loadTeacherData = useCallback(async () => {
     setLoading(true);
     try {
-      const [groupList, achievements] = await Promise.all([
+      const [groupList, achievements, subjectList] = await Promise.all([
         api.teacherGroups(),
         api.pendingAchievements(),
+        api.teacherSubjects(),
       ]);
       setGroups(groupList);
       setPendingAchievements(achievements);
+      setCreatedSubjects(subjectList);
       const nextGroup = selectedGroupId || groupList[0]?.id || null;
       setSelectedGroupId(nextGroup);
       if (nextGroup) {
@@ -1082,11 +1089,10 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
   const handleCreateSubject = async (event: FormEvent) => {
     event.preventDefault();
     await runTeacherAction(async () => {
-      const subject = await api.createSubject(newSubject);
-      setCreatedSubjects((items) => [subject, ...items]);
-      setGradeSubjectId(String(subject.id));
-      onNotice("success", `Предмет создан: ${subject.name}`);
+      await api.createSubject(newSubject);
+      onNotice("success", `Предмет создан: ${newSubject}`);
       setNewSubject("");
+      await loadTeacherData();
     });
   };
 
@@ -1094,9 +1100,9 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
     event.preventDefault();
     await runTeacherAction(async () => {
       await api.attachSubject(Number(attachSubjectId));
-      setGradeSubjectId(attachSubjectId);
       onNotice("success", `Предмет ${attachSubjectId} привязан`);
       setAttachSubjectId("");
+      await loadTeacherData();
     });
   };
 
@@ -1367,7 +1373,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     >
                       <option value="">Выберите группу</option>
                       {groups.map((group) => (
-                        <option key={group.id} value={group.id}>
+                        <option key={group.id} value={group.id.toString()}>
                           {group.name} · ID {group.id}
                         </option>
                       ))}
@@ -1405,11 +1411,11 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                 </div>
                 <div className="toolbar">
                   <select
-                    value={selectedGroupId || ""}
+                    value={selectedGroupId?.toString() || ""}
                     onChange={(event) => loadGradesForGroup(Number(event.target.value))}
                   >
                     {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
+                      <option key={group.id} value={group.id.toString()}>
                         {group.name}
                       </option>
                     ))}
@@ -1542,11 +1548,11 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                 </div>
                 <div className="toolbar filter-toolbar">
                   <select
-                    value={selectedGroupId || ""}
+                    value={selectedGroupId?.toString() || ""}
                     onChange={(event) => loadGradesForGroup(Number(event.target.value))}
                   >
                     {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
+                      <option key={group.id} value={group.id.toString()}>
                         {group.name}
                       </option>
                     ))}
@@ -1977,7 +1983,7 @@ function TeacherAchievementQueue({
   saving,
   onAction,
 }: {
-  achievements: Achievement[];
+  achievements: PendingAchievementView[];
   saving: boolean;
   onAction: (achievementId: number, action: "confirm" | "deny") => void;
 }) {
@@ -1992,7 +1998,7 @@ function TeacherAchievementQueue({
           <div>
             <h3>{achievement.title}</h3>
             <p>{achievement.description || "Без описания"}</p>
-            <span>ID ученика {achievement.student_id}</span>
+            <span>{achievement.student_name || `Ученик #${achievement.student_id}`}{achievement.group_name ? ` · ${achievement.group_name}` : ""}</span>
           </div>
           <div className="row-actions">
             <button

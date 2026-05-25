@@ -59,6 +59,18 @@ export interface Achievement {
   confirmed_by_teacher_id?: number;
 }
 
+export interface PendingAchievementView {
+  id: number;
+  student_id: number;
+  student_name: string;
+  group_id: number;
+  group_name: string;
+  title: string;
+  description?: string;
+  status: "pending" | "confirmed" | "denied";
+  confirmed: boolean;
+}
+
 export interface Merch {
   id: number;
   title: string;

@@ -86,24 +86,26 @@ func (r *AchievementRepository) DenyAchievement(ctx context.Context, id, teacher
 	return nil
 }
 
-func (r *AchievementRepository) GetPendingAchievements(ctx context.Context, teacherID int) ([]*models.Achievement, error) {
+func (r *AchievementRepository) GetPendingAchievements(ctx context.Context, teacherID int) ([]*models.PendingAchievementView, error) {
 	query := `
-		SELECT a.id, a.student_id, a.title, a.description, a.status, a.confirmed, COALESCE(a.confirmed_by_teacher_id, 0)
-		FROM achievements a
-		JOIN students s ON s.id = a.student_id
-		JOIN teacher_groups tg ON tg.group_id = s.group_id
-		WHERE a.status = 'pending' AND tg.teacher_id = $1
-		ORDER BY a.id`
+			SELECT a.id, a.student_id, s.name, COALESCE(s.group_id, 0), COALESCE(g.name, ''),
+			       a.title, a.description, a.status, a.confirmed
+			FROM achievements a
+			JOIN students s ON s.id = a.student_id
+			LEFT JOIN groups g ON g.id = s.group_id
+			JOIN teacher_groups tg ON tg.group_id = s.group_id
+			WHERE a.status = 'pending' AND tg.teacher_id = $1
+			ORDER BY a.id`
 	rows, err := r.pool.Query(ctx, query, teacherID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query achievements: %w", err)
 	}
 	defer rows.Close()
 
-	var achievements []*models.Achievement
+	var achievements []*models.PendingAchievementView
 	for rows.Next() {
-		var a models.Achievement
-		err := rows.Scan(&a.ID, &a.StudentID, &a.Title, &a.Description, &a.Status, &a.Confirmed, &a.ConfirmedByTeacherID)
+		var a models.PendingAchievementView
+		err := rows.Scan(&a.ID, &a.StudentID, &a.StudentName, &a.GroupID, &a.GroupName, &a.Title, &a.Description, &a.Status, &a.Confirmed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan achievement: %w", err)
 		}
