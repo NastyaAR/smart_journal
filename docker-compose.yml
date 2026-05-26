@@ -70,9 +70,27 @@ services:
     networks:
       - dev
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: smart_journal_frontend
+    environment:
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://host.docker.internal:3000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+    networks:
+      - dev
+
     
 volumes:
   postgres:
+  frontend_node_modules:
 
 networks:
     dev: 
