@@ -1906,11 +1906,19 @@ function RecommendationPanel({
 }) {
   const payload = recommendation?.payload;
   const hasGrades = grades.length > 0;
-  const strengths = payload?.strengths || [];
-  const weaknesses = payload?.weaknesses || [];
-  const subjectRecommendations = payload?.recommendations || [];
+  const strengths = Array.isArray(payload?.strengths)
+    ? payload.strengths
+    : [];
+  const weaknesses = Array.isArray(payload?.weaknesses)
+    ? payload.weaknesses
+    : [];
+
+  const subjectRecommendations = Array.isArray(payload?.recommendations)
+    ? payload.recommendations
+    : [];
   
   const recommendationServiceAvailable = true;
+  const hasPayload = payload && Object.keys(payload).length > 0;
 
   return (
     <section className="surface recommendations-panel">
@@ -1959,7 +1967,7 @@ function RecommendationPanel({
         />
       )}
 
-      {recommendationServiceAvailable && payload && (
+      {recommendationServiceAvailable && hasPayload && (
         <div className="recommendations-layout">
           <div className="recommendation-overview">
             <div>

@@ -344,7 +344,7 @@ func (h *StudentHandler) GetTokenOperations(c *fiber.Ctx) error {
 }
 
 func (h *StudentHandler) GenerateRecommendations(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
 	student, err := h.currentStudent(c, ctx)

@@ -24,6 +24,7 @@ type AIRecommendationResponse struct {
 	StudentID       string                  `json:"student_id"`
 	StudentName     string                  `json:"student_name"`
 	StudentSurname  string                  `json:"student_surname"`
+	Level           string                  `json:"level"`
 	Strengths       []string                `json:"strengths"`
 	Weaknesses      []string                `json:"weaknesses"`
 	Recommendations []SubjectRecommendation `json:"recommendations"`
