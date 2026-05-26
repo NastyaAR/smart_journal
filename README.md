@@ -4,17 +4,43 @@
 
 ### 1. Настройка переменных окружения
 
+Создайте файл `.env` в корне проекта:
+
 ```bash
 cp .env.example .env
 ```
 
 Откройте `.env` и укажите:
-- `GROQ_API_KEY` - ваш API ключ от Groq (получить на https://console.groq.com/keys)
+- `OPENROUTER_API_KEY` - ваш API ключ от OpenRouter (получить на https://openrouter.ai/keys)
+
+**Пример .env:**
+```env
+# Database
+PSQL_DB=smartjournal
+PSQL_USER=admin
+PSQL_PASSWORD=12345
+DATABASE_URL=postgres://admin:12345@localhost:5432/smartjournal?sslmode=disable
+DATABASE_URL_API=postgres://admin:12345@postgres_container:5432/smartjournal?sslmode=disable
+PSQL_PORT=5432
+
+# Blockchain
+CONTRACT_ADDRESS=0xYourContractAddress
+RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+CONTRACT_ADMIN_PRIVATE_KEY=your_contract_admin_private_key
+
+# LLM Service - OpenRouter (бесплатные модели)
+OPENROUTER_API_KEY=sk-or-ваш_ключ
+AI_SERVICE_URL=http://llm:8000
+
+# App
+PORT=3000
+VITE_BACKEND_URL=http://host.docker.internal:3000
+```
 
 ### 2. Запуск Docker
 
-```bash
-docker-compose up --build
+```powershell
+docker compose up --build
 ```
 
 Сервисы будут доступны по адресам:
@@ -42,7 +68,7 @@ docker-compose up --build
 ```
 smart_journal-main/
 ├── ai/                      # AI сервис (Python/FastAPI)
-│   ├── main.py             # Генерация рекомендаций через Groq
+│   ├── main.py             # Генерация рекомендаций через OpenRouter
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── cmd/api/                 # Backend API (Go/Fiber)
@@ -66,7 +92,7 @@ smart_journal-main/
 ### AI Сервис (Python)
 - **Порт**: 8000
 - **Фреймворк**: FastAPI
-- **Модель**: Llama 3.1 8B через Groq API
+- **Модель**: Mistral 7B Instruct через OpenRouter
 - **Эндпоинты**:
   - `GET /` - проверка статуса
   - `POST /get_recommendations` - генерация рекомендаций
@@ -93,19 +119,74 @@ smart_journal-main/
 ## Решение проблем
 
 ### AI рекомендации не работают
-1. Проверьте что `GROQ_API_KEY` указан в `.env`
-2. Убедитесь что AI сервис запущен: `docker-compose ps llm`
-3. Проверьте логи: `docker-compose logs llm`
+
+1. **Проверьте что OPENROUTER_API_KEY указан в .env**
+   ```powershell
+   Get-Content .env | Select-String OPENROUTER
+   ```
+
+2. **Получите новый ключ на https://openrouter.ai/keys**
+   - Зарегистрируйтесь через Google/GitHub
+   - Создайте API ключ
+   - Скопируйте и вставьте в .env
+
+3. **Перезапустите сервисы**
+   ```powershell
+   docker compose down
+   docker compose up --build -d
+   ```
+
+4. **Проверьте логи AI сервиса**
+   ```powershell
+   docker compose logs llm
+   ```
+
+5. **Протестируйте AI сервис напрямую**
+   ```powershell
+   # Проверка статуса
+   Invoke-RestMethod http://localhost:8000/
+   
+   # Тест генерации
+   $body = @{
+       student_id = "2"
+       student_name = "Иван"
+       student_surname = "Иванов"
+       grades = @(@{subject = "Математика"; score = 85})
+   } | ConvertTo-Json -Depth 5
+   
+   $result = Invoke-RestMethod http://localhost:8000/get_recommendations `
+       -Method Post `
+       -ContentType "application/json" `
+       -Body $body
+   
+   # Сохранить результат в файл (для просмотра русского текста)
+   $result | ConvertTo-Json -Depth 10 | Out-File result.json -Encoding UTF8
+   notepad result.json
+   ```
 
 ### Ошибки базы данных
-1. Перезапустите миграции: `docker-compose up migrations`
-2. Проверьте статус: `docker-compose logs migrations`
+
+1. Перезапустите миграции:
+   ```powershell
+   docker compose up migrations
+   ```
+
+2. Проверьте статус:
+   ```powershell
+   docker compose logs migrations
+   ```
 
 ### Студенты не загружаются
-Новая миграция `006_seed_students.sql` автоматически загружает:
+
+Миграция `006_seed_students.sql` автоматически загружает:
 - 10 студентов в 3 группах (БПИ-231, БПИ-232, БПИ-233)
 - Тестовые оценки по 3 предметам
 - Стартовые токены (100 AMT)
+
+Проверьте применение миграций:
+```powershell
+docker compose logs migrations
+```
 
 ---
 
@@ -137,7 +218,7 @@ go run main.go
 ```bash
 cd ai
 pip install -r requirements.txt
-uvicorn main:app --reload
+python main.py
 ```
 
 ### Локальный запуск Frontend
@@ -145,4 +226,31 @@ uvicorn main:app --reload
 cd frontend
 npm install
 npm run dev
+```
+
+---
+
+## API Ключи
+
+### OpenRouter (бесплатно)
+1. Зайдите на https://openrouter.ai/keys
+2. Войдите через Google/GitHub
+3. Создайте API ключ
+4. Используйте бесплатные модели:
+   - `mistralai/mistral-7b-instruct-v0.1`
+   - `google/gemma-7b-it:free`
+   - `meta-llama/llama-3-8b-instruct:free`
+
+---
+
+## Структура миграций
+
+```
+migrations/
+├── 001_init.sql                    # Базовая схема
+├── 002_seed_teachers_and_merch.sql # Учителя и мерч
+├── 003_activity_status_...         # Статусы активностей
+├── 004_student_recommendations.sql # Таблица рекомендаций
+├── 005_grade_dates_and_...         # Даты оценок
+└── 006_seed_students.sql           # Тестовые студенты
 ```

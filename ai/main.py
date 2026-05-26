@@ -10,20 +10,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 app = FastAPI()
-print(os.getenv("GROQ_API_KEY"))
 
 client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
 )
-
-MODEL_NAME = "llama-3.1-8b-instant"
-
+MODEL_NAME = "mistralai/mistral-7b-instruct-v0.1"
 
 class Grade(BaseModel):
     subject: str
     score: int
-
 
 class StudentRequest(BaseModel):
     student_id: str
@@ -31,100 +27,68 @@ class StudentRequest(BaseModel):
     student_surname: str
     grades: List[Grade]
 
-
 def extract_json(text: str):
     text = text.strip()
-
-    text = re.sub(r"^```json\s*", "", text)
-    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"^json\s*", "", text)
+    text = re.sub(r"^\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
-
     start = text.find("{")
     end = text.rfind("}")
-
     if start != -1 and end != -1:
         text = text[start:end + 1]
-
     return json.loads(text)
-
 
 @app.get("/")
 def root():
     return {"status": "ok", "message": "FastAPI server is running"}
 
-
 @app.post("/get_recommendations")
 def get_recommendations(data: StudentRequest):
-    if not os.getenv("GROQ_API_KEY"):
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
         raise HTTPException(
             status_code=500,
-            detail="GROQ_API_KEY не найден."
+            detail="OPENROUTER_API_KEY не найден."
         )
-
     grades_text = "\n".join(
         f"- {grade.subject}: {grade.score}" for grade in data.grades
     )
-
     prompt = f"""
-Ты — опытный образовательный ИИ-помощник и персональный наставник.
-
-Проанализируй оценки ученика и дай персонализированные рекомендации на русском языке.
-
-Данные ученика:
-student_id: {data.student_id}
-student_name: {data.student_name}
-student_surname: {data.student_surname}
-
-Оценки (шкала 0–100):
-{grades_text}
-
-Правила оценки уровня:
-- 90–100: отличный уровень
-- 75–89: хороший уровень
-- 60–74: средний уровень, есть пробелы
-- ниже 60: слабый уровень, нужна серьёзная работа
-
-Верни только JSON без markdown.
-
-Формат:
+Ты — опытный образовательный ИИ-помощник.
+Проанализируй оценки и дай рекомендации на русском языке.
+Данные:
+- student_id: {data.student_id}
+- student_name: {data.student_name} {data.student_surname}
+- Оценки: {grades_text}
+Правила:
+- 90-100: отличный уровень
+- 75-89: хороший уровень  
+- 60-74: средний уровень
+- ниже 60: слабый уровень
+Верни ТОЛЬКО JSON без markdown:
 {{
   "student_id": "{data.student_id}",
   "student_name": "{data.student_name}",
   "student_surname": "{data.student_surname}",
-  "strengths": [
-    "Конкретная сильная сторона с пояснением"
-  ],
-  "weaknesses": [
-    "Конкретная слабая сторона с пояснением"
-  ],
+  "strengths": ["сильная сторона"],
+  "weaknesses": ["слабая сторона"],
   "recommendations": [
-    {{
-      "subject": "Название предмета",
-      "score": 0,
-      "recommendation": "Конкретный совет (2–3 предложения)"
-    }}
+    {{"subject": "Предмет", "score": 85, "recommendation": "совет"}}
   ],
-  "general_advice": "Персонализированный совет (1–2 предложения)"
+  "general_advice": "общий совет"
 }}
 """.strip()
-
+    
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
-                {
-                    "role": "system",
-                    "content": "Ты возвращаешь только валидный JSON без markdown."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "system", "content": "Верни только JSON."},
+                {"role": "user", "content": prompt}
             ],
             temperature=0.2,
-                max_tokens=1500,
+            max_tokens=1500,
         )
-
         model_text = completion.choices[0].message.content
 
         try:
@@ -136,10 +100,10 @@ student_surname: {data.student_surname}
                 "student_surname": data.student_surname,
                 "raw_recommendations": model_text
             }
-
+        
     except Exception as e:
-        print("GROQ ERROR:", repr(e))
+        print("OPENROUTER ERROR:", repr(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка при обращении к Groq: {repr(e)}"
+            detail=f"Ошибка OpenRouter: {repr(e)}"
         )
