@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, getReadableErrorMessage } from "./api";
+import { ChatWidget } from "./ChatWidget";
 import type {
   Achievement,
   GradeView,
@@ -401,6 +402,8 @@ function Workspace({
         <LogOut size={18} aria-hidden="true" />
         Выйти
       </button>
+      {/* AI Chat Widget - только для студентов */}
+      {role === "student" && <ChatWidget />}
     </section>
   );
 }

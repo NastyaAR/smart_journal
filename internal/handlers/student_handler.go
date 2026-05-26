@@ -404,6 +404,42 @@ func (h *StudentHandler) GetLatestRecommendation(c *fiber.Ctx) error {
 	return c.JSON(recommendation)
 }
 
+func (h *StudentHandler) Chat(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var req struct {
+		Message string `json:"message"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	if req.Message == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Message is required"})
+	}
+
+	student, err := h.currentStudent(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	// Получаем оценки для контекста
+	grades, _ := h.gradeRepo.GetGradeViewsByStudentID(ctx, student.ID)
+	context := fmt.Sprintf("Студент: %s, Группа: %d", student.Name, student.GroupID)
+	if len(grades) > 0 {
+		context += fmt.Sprintf(", Оценок: %d", len(grades))
+	}
+
+	response, err := h.aiService.Chat(ctx, req.Message, context)
+	if err != nil {
+		return c.Status(http.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"response": response})
+}
+
 func splitStudentName(fullName string) (string, string) {
 	parts := strings.Fields(fullName)
 	if len(parts) == 0 {

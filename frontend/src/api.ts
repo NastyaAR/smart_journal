@@ -225,6 +225,9 @@ export const api = {
     post<MessageResponse>("/teachers/achievements/deny", { achievement_id }),
   awardTokens: (student_id: number, amount: number) =>
     post<MessageResponse>("/teachers/tokens/award", { student_id, amount }),
+
+  // AI Chat
+  chat: (message: string) => post<{ response: string }>("/students/chat", { message }),
 };
   
  

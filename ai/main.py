@@ -35,6 +35,11 @@ class StudentRequest(BaseModel):
     grades: List[Grade]
 
 
+class ChatRequest(BaseModel):
+    message: str
+    context: str = ""  # опционально: контекст (оценки, предметы)
+
+
 # -------------------------
 # JSON PARSER
 # -------------------------
@@ -89,6 +94,39 @@ def normalize_output(data: dict, grades: List[Grade]):
 @app.get("/")
 def root():
     return {"status": "ok", "message": "FastAPI server is running"}
+
+
+@app.post("/chat")
+def chat(data: ChatRequest):
+    """Обработка вопросов пользователя в чате"""
+
+    if not os.getenv("OPENROUTER_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY не найден")
+
+    system_prompt = """Ты — полезный помощник учебного журнала Smart Journal.
+Ты отвечаешь на вопросы об оценках, успеваемости, рекомендациях по обучению.
+Отвечай кратко, по делу, дружелюбно.
+Если не знаешь ответа — честно скажи об этом."""
+
+    user_message = data.message
+    if data.context:
+        user_message = f"Контекст:\n{data.context}\n\nВопрос: {data.message}"
+
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.7,
+            max_tokens=500,
+        )
+
+        return {"response": completion.choices[0].message.content}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка OpenRouter: {repr(e)}")
 
 
 @app.post("/get_recommendations")

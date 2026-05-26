@@ -162,4 +162,5 @@ func setupRoutes(
 	students.Get("/token-operations", studentHandler.GetTokenOperations)
 	students.Post("/recommendations", studentHandler.GenerateRecommendations)
 	students.Get("/recommendations", studentHandler.GetLatestRecommendation)
+	students.Post("/chat", studentHandler.Chat)
 }
