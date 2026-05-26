@@ -38,6 +38,51 @@ services:
     networks:
       - dev
 
+  llm:
+    build:
+      context: .
+      dockerfile: ai/Dockerfile
+    container_name: llm_service
+    env_file:
+      - .env  
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai:/app  # для hot-reload в разработке
+    networks:
+      - dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smart_journal_api
+    environment:
+      - DATABASE_URL=${DATABASE_URL_API}
+      - AI_SERVICE_URL=${AI_SERVICE_URL}
+      - PORT=3000
+      - GODEBUG=netdns=go
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      llm:
+        condition: service_healthy
+    networks:
+      - dev
+    restart: unless-stopped
+
   migrations:
     image: kukymbr/goose-docker:3.24.3
     depends_on:

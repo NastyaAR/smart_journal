@@ -1909,7 +1909,8 @@ function RecommendationPanel({
   const strengths = payload?.strengths || [];
   const weaknesses = payload?.weaknesses || [];
   const subjectRecommendations = payload?.recommendations || [];
-  const recommendationServiceAvailable = false;
+  
+  const recommendationServiceAvailable = true;
 
   return (
     <section className="surface recommendations-panel">
@@ -1921,12 +1922,12 @@ function RecommendationPanel({
         <button
           className="primary-button"
           type="button"
-          title="Сервис рекомендаций временно недоступен."
-          disabled
+          title={recommendationServiceAvailable ? "Сгенерировать персональные рекомендации" : "Сервис временно недоступен"}
+          disabled={!recommendationServiceAvailable || loading || !hasGrades}
           onClick={recommendationServiceAvailable ? onGenerate : undefined}
         >
           {loading ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-          Сервис недоступен
+          {loading ? "Генерируем..." : "Сгенерировать рекомендации"}
         </button>
       </div>
 
@@ -1951,7 +1952,7 @@ function RecommendationPanel({
         </div>
       )}
 
-      {recommendationServiceAvailable && hasGrades && !payload && !error && (
+      {recommendationServiceAvailable && hasGrades && !payload && !error && !loading && (
         <EmptyState
           title="Рекомендаций пока нет"
           text="Нажмите кнопку, чтобы отправить текущие оценки в AI-сервис и сохранить результат."

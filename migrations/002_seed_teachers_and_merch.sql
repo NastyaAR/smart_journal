@@ -1,5 +1,5 @@
 -- +goose Up
--- Пароль для всех сидовых учителей: password
+-- Пароль для всех учителей: password
 WITH teacher_seed(name, email, password) AS (
     VALUES
     ('Анна Иванова', 'anna.ivanova@school.edu', 'password'),

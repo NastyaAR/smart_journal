@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -18,19 +19,35 @@ type AIService struct {
 }
 
 func NewAIService(baseURL string) *AIService {
+
 	if baseURL == "" {
-		baseURL = "http://127.0.0.1:8000"
+		baseURL = "http://llm:8000" //"http://127.0.0.1:8000"
 	}
 
 	return &AIService{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: 220 * time.Second,
 		},
 	}
 }
 
 func (a *AIService) GetRecommendations(ctx context.Context, req *models.AIRecommendationRequest) (*models.AIRecommendationResponse, error) {
+
+	log.Printf("[AI] Input: ID=%s, Name=%q, Surname=%q, GradesCount=%d",
+		req.StudentID, req.StudentName, req.StudentSurname, len(req.Grades))
+
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		log.Printf("[AI] Marshal error: %v", err)
+		return nil, err
+	}
+
+	log.Printf("[AI] Request JSON: %s", string(bodyBytes))
+	targetURL := a.baseURL + "/get_recommendations"
+	log.Printf("[AI] Calling URL: %s", targetURL)
+	log.Printf("[AI] Timeout: %v", a.httpClient.Timeout)
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal AI request: %w", err)

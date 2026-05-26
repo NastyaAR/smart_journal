@@ -73,6 +73,13 @@ func main() {
 
 	aiService := services.NewAIService(os.Getenv("AI_SERVICE_URL"))
 
+	aiURL := os.Getenv("AI_SERVICE_URL")
+	if aiURL == "" {
+		log.Println("WARNING: AI_SERVICE_URL is EMPTY, using default fallback!")
+	} else {
+		log.Printf("AI_SERVICE_URL = %s", aiURL)
+	}
+
 	authHandler := handlers.NewAuthHandler(services.NewAuthService(userRepository))
 	studentHandler := handlers.NewStudentHandler(
 		studentService,
