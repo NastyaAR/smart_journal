@@ -141,11 +141,7 @@ func (h *StudentHandler) GetGrades(c *fiber.Ctx) error {
 		return handleFiberError(c, err)
 	}
 
-	if student.GroupID == 0 {
-		return c.JSON([]*models.GradeView{})
-	}
-
-	grades, err := h.gradeRepo.GetGradeViewsByGroupID(ctx, student.GroupID)
+	grades, err := h.gradeRepo.GetGradeViewsByStudentID(ctx, student.ID)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -176,9 +172,23 @@ func (h *StudentHandler) GetGroup(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	type classmateView struct {
+		ID      int    `json:"id"`
+		Name    string `json:"name"`
+		GroupID int    `json:"group_id"`
+	}
+	classmates := make([]classmateView, 0, len(studentsInGroup))
+	for _, item := range studentsInGroup {
+		classmates = append(classmates, classmateView{
+			ID:      item.ID,
+			Name:    item.Name,
+			GroupID: item.GroupID,
+		})
+	}
+
 	return c.JSON(fiber.Map{
 		"group":    group,
-		"students": studentsInGroup,
+		"students": classmates,
 	})
 }
 
@@ -314,6 +324,23 @@ func (h *StudentHandler) GetPurchases(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(purchases)
+}
+
+func (h *StudentHandler) GetTokenOperations(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	student, err := h.currentStudent(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	operations, err := h.studentService.GetTokenOperations(ctx, student.ID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(operations)
 }
 
 func (h *StudentHandler) GenerateRecommendations(c *fiber.Ctx) error {

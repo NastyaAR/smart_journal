@@ -13,23 +13,26 @@ import (
 )
 
 type StudentService struct {
-	repo            *repositories.StudentRepository
-	achievementRepo *repositories.AchievementRepository
-	userRepository  *repositories.UserRepository
-	contractAdapter adapters.ContractAdapter
+	repo               *repositories.StudentRepository
+	achievementRepo    *repositories.AchievementRepository
+	tokenOperationRepo *repositories.TokenOperationRepository
+	userRepository     *repositories.UserRepository
+	contractAdapter    adapters.ContractAdapter
 }
 
 func NewStudentService(
 	repo *repositories.StudentRepository,
 	achievementRepo *repositories.AchievementRepository,
+	tokenOperationRepo *repositories.TokenOperationRepository,
 	userRepository *repositories.UserRepository,
 	contractAdapter adapters.ContractAdapter,
 ) *StudentService {
 	return &StudentService{
-		repo:            repo,
-		achievementRepo: achievementRepo,
-		userRepository:  userRepository,
-		contractAdapter: contractAdapter,
+		repo:               repo,
+		achievementRepo:    achievementRepo,
+		tokenOperationRepo: tokenOperationRepo,
+		userRepository:     userRepository,
+		contractAdapter:    contractAdapter,
 	}
 }
 
@@ -67,6 +70,23 @@ func (s *StudentService) AwardTokensForAchievement(ctx context.Context, achievem
 		return fmt.Errorf("failed to update student tokens in db: %w", err)
 	}
 
+	if s.tokenOperationRepo != nil {
+		var teacherID *int
+		if achievement.ConfirmedByTeacherID != 0 {
+			value := achievement.ConfirmedByTeacherID
+			teacherID = &value
+		}
+		if err := s.tokenOperationRepo.Create(ctx, &models.TokenOperation{
+			StudentID:     studentID,
+			TeacherID:     teacherID,
+			Amount:        10,
+			OperationType: "achievement_reward",
+			Reason:        achievement.Title,
+		}); err != nil {
+			return fmt.Errorf("failed to record token operation: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -100,7 +120,23 @@ func (s *StudentService) PurchaseMerch(ctx context.Context, studentID, merchID, 
 		return 0, 0, fmt.Errorf("failed to redeem tokens on blockchain: %w", err)
 	}
 
-	return s.repo.PurchaseMerch(ctx, studentID, merchID, price)
+	newBalance, purchaseID, err := s.repo.PurchaseMerch(ctx, studentID, merchID, price)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if s.tokenOperationRepo != nil {
+		if err := s.tokenOperationRepo.Create(ctx, &models.TokenOperation{
+			StudentID:     studentID,
+			Amount:        -price,
+			OperationType: "purchase",
+			Reason:        fmt.Sprintf("Purchase #%d", purchaseID),
+		}); err != nil {
+			return 0, 0, fmt.Errorf("failed to record token operation: %w", err)
+		}
+	}
+
+	return newBalance, purchaseID, nil
 }
 
 func (s *StudentService) GetStudentByUserID(ctx context.Context, userID int) (*models.Student, error) {
@@ -109,6 +145,13 @@ func (s *StudentService) GetStudentByUserID(ctx context.Context, userID int) (*m
 
 func (s *StudentService) GetStudentsByGroupID(ctx context.Context, groupID int) ([]*models.Student, error) {
 	return s.repo.GetStudentsByGroupID(ctx, groupID)
+}
+
+func (s *StudentService) GetTokenOperations(ctx context.Context, studentID int) ([]*models.TokenOperation, error) {
+	if s.tokenOperationRepo == nil {
+		return []*models.TokenOperation{}, nil
+	}
+	return s.tokenOperationRepo.GetByStudentID(ctx, studentID)
 }
 
 func (s *StudentService) CreateStudent(ctx context.Context, student *models.Student, userID int) error {

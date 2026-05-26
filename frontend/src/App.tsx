@@ -15,6 +15,7 @@ import {
   RefreshCw,
   School,
   ShoppingBag,
+  Sparkles,
   User,
   UserPlus,
   Users,
@@ -35,7 +36,10 @@ import type {
   SessionResponse,
   Student,
   StudentGroupResponse,
+  StudentMeResponse,
+  StoredRecommendation,
   Subject,
+  TokenOperation,
 } from "./types";
 
 type StatusKind = "success" | "error" | "info";
@@ -46,7 +50,7 @@ interface Notice {
 }
 
 type AuthMode = "teacher" | "student";
-type StudentTab = "overview" | "wallet" | "grades" | "achievements" | "market" | "purchases";
+type StudentTab = "overview" | "wallet" | "grades" | "recommendations" | "achievements" | "market" | "purchases";
 type TeacherTab = "overview" | "groups" | "grades" | "requests" | "tokens";
 
 interface TokenEvent {
@@ -162,6 +166,32 @@ function buildTokenEvents(achievements: Achievement[], purchases: Purchase[]): T
   return [...income, ...expenses];
 }
 
+const tokenOperationTitle: Record<TokenOperation["operation_type"], string> = {
+  achievement_reward: "Награда за активность",
+  manual_award: "Ручное начисление",
+  purchase: "Покупка",
+};
+
+function buildTokenEventsFromOperations(operations: TokenOperation[]): TokenEvent[] {
+  return operations.map<TokenEvent>((operation) => ({
+    id: `operation-${operation.id}`,
+    title: operation.reason || tokenOperationTitle[operation.operation_type],
+    detail: [
+      tokenOperationTitle[operation.operation_type],
+      operation.teacher_name ? `Преподаватель: ${operation.teacher_name}` : "",
+    ].filter(Boolean).join(" · "),
+    amount: operation.amount,
+    kind: operation.amount >= 0 ? "income" : "expense",
+    date: operation.created_at,
+  }));
+}
+
+function studentOptionsFromStudents(students: Student[]): StudentOption[] {
+  return students
+    .map((student) => ({ id: student.id, name: student.name || `Студент #${student.id}` }))
+    .sort((left, right) => left.name.localeCompare(right.name, "ru"));
+}
+
 function knownStudentsFrom(grades: GradeView[], achievements: Achievement[]): StudentOption[] {
   const byId = new Map<number, string>();
 
@@ -227,6 +257,14 @@ function filterAchievements(achievements: (Achievement | PendingAchievementView)
 
     return searchable.includes(value);
   });
+}
+
+function filterAchievementsByGroup(
+  achievements: PendingAchievementView[],
+  groupFilter: string,
+): PendingAchievementView[] {
+  if (groupFilter === "all") return achievements;
+  return achievements.filter((achievement) => achievement.group_id === Number(groupFilter));
 }
 
 function useNotice() {
@@ -592,7 +630,10 @@ function AuthPanel({
                       <circle cx="12" cy="12" r="10"/>
                       <path d="M12 16v-4M12 8h.01"/>
                     </svg>
-                    <span>Демо-доступ: <strong>anna.ivanova@school.edu</strong> / <strong>password</strong></span>
+                    <span>
+                      Демо-доступ: <strong>{demoCredentials[mode].login}</strong> /{" "}
+                      <strong>{demoCredentials[mode].password}</strong>
+                    </span>
                   </div>
                 </form>
               )}
@@ -671,42 +712,72 @@ function StudentWorkspace({
   onNotice: (kind: StatusKind, text: string) => void;
 }) {
   const [tab, setTab] = useState<StudentTab>("overview");
+  const [profile, setProfile] = useState<StudentMeResponse | null>(null);
   const [groupData, setGroupData] = useState<StudentGroupResponse | null>(null);
   const [grades, setGrades] = useState<GradeView[]>([]);
   const [balance, setBalance] = useState(0);
   const [merch, setMerch] = useState<Merch[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [tokenOperations, setTokenOperations] = useState<TokenOperation[]>([]);
+  const [recommendation, setRecommendation] = useState<StoredRecommendation | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [achievementTitle, setAchievementTitle] = useState("");
   const [achievementDescription, setAchievementDescription] = useState("");
   const [studentSubjectFilter, setStudentSubjectFilter] = useState("all");
 
+  const loadLatestRecommendation = useCallback(async (showNotice = false) => {
+    try {
+      const latest = await api.latestRecommendation();
+      setRecommendation(latest);
+      setRecommendationError(null);
+    } catch (error) {
+      setRecommendation(null);
+      if (error instanceof ApiError && error.status === 404) {
+        setRecommendationError(null);
+        return;
+      }
+
+      const message = getReadableErrorMessage(error);
+      setRecommendationError(message);
+      if (showNotice) {
+        onNotice("error", message);
+      }
+    }
+  }, [onNotice]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [group, gradeList, balanceValue, merchList, purchaseList, achievementList] =
+      const [studentProfile, group, gradeList, balanceValue, merchList, purchaseList, achievementList, tokenHistory] =
         await Promise.all([
+          api.studentMe(),
           api.studentGroup(),
           api.studentGrades(),
           api.studentBalance(),
           api.studentMerch(),
           api.studentPurchases(),
           api.studentAchievements(),
+          api.studentTokenOperations(),
         ]);
+      setProfile(studentProfile);
       setGroupData(group);
       setGrades(gradeList);
       setBalance(Number(balanceValue.balance || 0));
       setMerch(merchList);
       setPurchases(purchaseList);
       setAchievements(achievementList);
+      setTokenOperations(tokenHistory);
+      await loadLatestRecommendation(false);
     } catch (error) {
       onNotice("error", getReadableErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [onNotice]);
+  }, [loadLatestRecommendation, onNotice]);
 
   useEffect(() => {
     loadData();
@@ -748,18 +819,49 @@ function StudentWorkspace({
     }
   };
 
+  const generateRecommendation = async () => {
+    setRecommendationLoading(true);
+    setRecommendationError(null);
+    try {
+      const result = await api.generateRecommendation();
+      setRecommendation(result);
+      onNotice("success", "AI-рекомендации обновлены");
+    } catch (error) {
+      let message = getReadableErrorMessage(error);
+      if (error instanceof ApiError && error.status === 400) {
+        message = "Для рекомендаций нужны оценки в журнале. Попросите преподавателя добавить хотя бы одну оценку.";
+      }
+      if (error instanceof ApiError && error.status === 502) {
+        message = "Сервис рекомендаций временно недоступен.";
+      }
+      setRecommendationError(message);
+      onNotice("error", message);
+    } finally {
+      setRecommendationLoading(false);
+    }
+  };
+
   const pendingCount = achievements.filter((item) => item.status === "pending").length;
   const confirmedCount = achievements.filter((item) => item.status === "confirmed").length;
-  const currentStudent =
-    groupData?.students.find((student) => student.user_id === session.user_id) || null;
-  const currentStudentId =
-    currentStudent?.id || achievements[0]?.student_id || purchases[0]?.student_id || null;
+  const currentStudentId = profile?.student_id || null;
+  const currentStudent = profile
+    ? {
+        id: profile.student_id,
+        name: profile.name,
+        email: profile.email,
+        group_id: profile.group_id,
+        tokens: profile.tokens,
+        user_id: session.user_id,
+      }
+    : null;
   const ownGrades = currentStudentId
     ? grades.filter((grade) => grade.student_id === currentStudentId)
-    : [];
+    : grades;
   const classmates = groupData?.students || [];
-  const walletAddress = studentWalletAddress(currentStudentId);
-  const tokenEvents = buildTokenEvents(achievements, purchases);
+  const walletAddress = profile?.wallet_address || studentWalletAddress(currentStudentId);
+  const tokenEvents = tokenOperations.length
+    ? buildTokenEventsFromOperations(tokenOperations)
+    : buildTokenEvents(achievements, purchases);
   const subjects = Array.from(new Set(ownGrades.map((grade) => grade.subject_name))).filter(Boolean);
   const subjectOptions = knownSubjectsFrom(ownGrades, []);
   const filteredOwnGrades = filterGrades(ownGrades, "all", studentSubjectFilter);
@@ -787,6 +889,7 @@ function StudentWorkspace({
             { id: "overview", label: "Обзор", icon: <School size={18} /> },
             { id: "wallet", label: "Кошелек", icon: <Wallet size={18} /> },
             { id: "grades", label: "Оценки", icon: <BookOpen size={18} /> },
+            { id: "recommendations", label: "Рекомендации", icon: <Sparkles size={18} /> },
             { id: "achievements", label: "Активности", icon: <Medal size={18} /> },
             { id: "market", label: "Маркет", icon: <ShoppingBag size={18} /> },
             { id: "purchases", label: "Покупки", icon: <ListChecks size={18} /> },
@@ -882,6 +985,16 @@ function StudentWorkspace({
               <GradeSummary grades={filteredOwnGrades} mode="subjects" />
               <GradeTable grades={filteredOwnGrades} showStudent={false} />
             </section>
+          )}
+
+          {tab === "recommendations" && (
+            <RecommendationPanel
+              grades={ownGrades}
+              recommendation={recommendation}
+              loading={recommendationLoading}
+              error={recommendationError}
+              onGenerate={generateRecommendation}
+            />
           )}
 
           {tab === "achievements" && (
@@ -997,6 +1110,8 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
   const [pendingAchievements, setPendingAchievements] = useState<PendingAchievementView[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupGrades, setGroupGrades] = useState<GradeView[]>([]);
+  const [groupStudents, setGroupStudents] = useState<Student[]>([]);
+  const [tokenOperations, setTokenOperations] = useState<TokenOperation[]>([]);
   const [createdSubjects, setCreatedSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1010,10 +1125,12 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
   const [gradeStudentId, setGradeStudentId] = useState("");
   const [gradeSubjectId, setGradeSubjectId] = useState("");
   const [gradeValue, setGradeValue] = useState("5");
+  const [gradeLessonDate, setGradeLessonDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [awardStudentId, setAwardStudentId] = useState("");
   const [awardAmount, setAwardAmount] = useState("10");
   const [gradeStudentFilter, setGradeStudentFilter] = useState("all");
   const [gradeSubjectFilter, setGradeSubjectFilter] = useState("all");
+  const [requestGroupFilter, setRequestGroupFilter] = useState("all");
   const [requestSearch, setRequestSearch] = useState("");
 
   const loadTeacherData = useCallback(async () => {
@@ -1030,10 +1147,18 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
       const nextGroup = selectedGroupId || groupList[0]?.id || null;
       setSelectedGroupId(nextGroup);
       if (nextGroup) {
-        const grades = await api.teacherGroupGrades(nextGroup);
+        const [grades, students, operations] = await Promise.all([
+          api.teacherGroupGrades(nextGroup),
+          api.teacherGroupStudents(nextGroup),
+          api.teacherGroupTokenOperations(nextGroup),
+        ]);
         setGroupGrades(grades);
+        setGroupStudents(students);
+        setTokenOperations(operations);
       } else {
         setGroupGrades([]);
+        setGroupStudents([]);
+        setTokenOperations([]);
       }
     } catch (error) {
       onNotice("error", getReadableErrorMessage(error));
@@ -1059,8 +1184,14 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
     setGradeSubjectFilter("all");
     setAwardStudentId("");
     try {
-      const grades = await api.teacherGroupGrades(groupId);
+      const [grades, students, operations] = await Promise.all([
+        api.teacherGroupGrades(groupId),
+        api.teacherGroupStudents(groupId),
+        api.teacherGroupTokenOperations(groupId),
+      ]);
       setGroupGrades(grades);
+      setGroupStudents(students);
+      setTokenOperations(operations);
     } catch (error) {
       onNotice("error", getReadableErrorMessage(error));
     }
@@ -1123,6 +1254,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
         student_id: Number(gradeStudentId),
         subject_id: Number(gradeSubjectId),
         value: Number(gradeValue),
+        lesson_date: gradeLessonDate,
       });
       onNotice("success", "Оценка добавлена");
       if (selectedGroupId) await loadGradesForGroup(selectedGroupId);
@@ -1144,6 +1276,7 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
       await api.awardTokens(studentID, amount);
       onNotice("success", `${amount} AMT начислено ученику ${awardStudentId}`);
       setAwardStudentId("");
+      if (selectedGroupId) await loadGradesForGroup(selectedGroupId);
     });
   };
 
@@ -1176,8 +1309,8 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
     [groups, selectedGroupId],
   );
   const knownStudents = useMemo(
-    () => knownStudentsFrom(groupGrades, []),
-    [groupGrades],
+    () => studentOptionsFromStudents(groupStudents),
+    [groupStudents],
   );
   const knownSubjects = useMemo(
     () => knownSubjectsFrom(groupGrades, createdSubjects),
@@ -1192,8 +1325,8 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
     [groupGrades, gradeStudentFilter, gradeSubjectFilter],
   );
   const filteredPendingAchievements = useMemo(
-    () => filterAchievements(pendingAchievements, requestSearch),
-    [pendingAchievements, requestSearch],
+    () => filterAchievements(filterAchievementsByGroup(pendingAchievements, requestGroupFilter), requestSearch),
+    [pendingAchievements, requestGroupFilter, requestSearch],
   );
 
   return (
@@ -1504,6 +1637,15 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     ))}
                   </select>
                 </label>
+                <label>
+                  Дата занятия
+                  <input
+                    type="date"
+                    value={gradeLessonDate}
+                    onChange={(event) => setGradeLessonDate(event.target.value)}
+                    required
+                  />
+                </label>
                 <button className="primary-button" type="submit" title="Поставить оценку" disabled={saving}>
                   <Check size={16} aria-hidden="true" />
                   Поставить
@@ -1522,6 +1664,17 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                 <Medal size={20} aria-hidden="true" />
               </div>
               <div className="toolbar filter-toolbar">
+                <select
+                  value={requestGroupFilter}
+                  onChange={(event) => setRequestGroupFilter(event.target.value)}
+                >
+                  <option value="all">Все группы</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
                 <input
                   value={requestSearch}
                   onChange={(event) => setRequestSearch(event.target.value)}
@@ -1537,8 +1690,9 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
           )}
 
           {tab === "tokens" && (
-            <div className="two-column">
-              <section className="surface form-surface">
+            <>
+              <div className="two-column">
+                <section className="surface form-surface">
                 <div className="section-heading">
                   <div>
                     <p>AMT</p>
@@ -1584,22 +1738,34 @@ function TeacherWorkspace({ onNotice }: { onNotice: (kind: StatusKind, text: str
                     Начислить
                   </button>
                 </form>
-              </section>
+                </section>
+
+                <section className="surface">
+                  <div className="section-heading">
+                    <div>
+                      <p>{selectedGroup?.name || "Группа не выбрана"}</p>
+                      <h2>Студенты группы</h2>
+                    </div>
+                    <Users size={20} aria-hidden="true" />
+                  </div>
+                  <StudentShortcutList
+                    students={knownStudents}
+                    onPick={(id) => setAwardStudentId(String(id))}
+                  />
+                </section>
+              </div>
 
               <section className="surface">
                 <div className="section-heading">
                   <div>
                     <p>{selectedGroup?.name || "Группа не выбрана"}</p>
-                    <h2>ID из журнала</h2>
+                    <h2>История операций AMT</h2>
                   </div>
-                  <Users size={20} aria-hidden="true" />
+                  <ListChecks size={20} aria-hidden="true" />
                 </div>
-                <StudentShortcutList
-                  students={knownStudents}
-                  onPick={(id) => setAwardStudentId(String(id))}
-                />
+                <TokenOperationTable operations={tokenOperations} showStudent />
               </section>
-            </div>
+            </>
           )}
         </>
       )}
@@ -1725,6 +1891,147 @@ function PendingGroupState({
   );
 }
 
+function RecommendationPanel({
+  grades,
+  recommendation,
+  loading,
+  error,
+  onGenerate,
+}: {
+  grades: GradeView[];
+  recommendation: StoredRecommendation | null;
+  loading: boolean;
+  error: string | null;
+  onGenerate: () => void;
+}) {
+  const payload = recommendation?.payload;
+  const hasGrades = grades.length > 0;
+  const strengths = payload?.strengths || [];
+  const weaknesses = payload?.weaknesses || [];
+  const subjectRecommendations = payload?.recommendations || [];
+  const recommendationServiceAvailable = false;
+
+  return (
+    <section className="surface recommendations-panel">
+      <div className="section-heading recommendations-heading">
+        <div>
+          <p>AI-помощник</p>
+          <h2>Рекомендации по курсам</h2>
+        </div>
+        <button
+          className="primary-button"
+          type="button"
+          title="Сервис рекомендаций временно недоступен."
+          disabled
+          onClick={recommendationServiceAvailable ? onGenerate : undefined}
+        >
+          {loading ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+          Сервис недоступен
+        </button>
+      </div>
+
+      {!recommendationServiceAvailable && (
+        <div className="recommendation-alert">
+          <Sparkles size={18} aria-hidden="true" />
+          <span>Сервис рекомендаций временно недоступен.</span>
+        </div>
+      )}
+
+      {recommendationServiceAvailable && !hasGrades && (
+        <EmptyState
+          title="Нет оценок для анализа"
+          text="Рекомендации появятся после того, как преподаватель добавит оценки в журнал."
+        />
+      )}
+
+      {recommendationServiceAvailable && hasGrades && error && (
+        <div className="recommendation-alert">
+          <Sparkles size={18} aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {recommendationServiceAvailable && hasGrades && !payload && !error && (
+        <EmptyState
+          title="Рекомендаций пока нет"
+          text="Нажмите кнопку, чтобы отправить текущие оценки в AI-сервис и сохранить результат."
+        />
+      )}
+
+      {recommendationServiceAvailable && payload && (
+        <div className="recommendations-layout">
+          <div className="recommendation-overview">
+            <div>
+              <span>Последнее обновление</span>
+              <strong>{recommendation ? formatDate(recommendation.created_at) : "нет данных"}</strong>
+            </div>
+            <div>
+              <span>Оценок в анализе</span>
+              <strong>{grades.length}</strong>
+            </div>
+            <div>
+              <span>Предметов</span>
+              <strong>{new Set(grades.map((grade) => grade.subject_id)).size}</strong>
+            </div>
+          </div>
+
+          <div className="recommendation-columns">
+            <RecommendationList title="Сильные стороны" items={strengths} variant="strength" />
+            <RecommendationList title="Что подтянуть" items={weaknesses} variant="weakness" />
+          </div>
+
+          {payload.general_advice && (
+            <article className="general-advice">
+              <span>Общий совет</span>
+              <p>{payload.general_advice}</p>
+            </article>
+          )}
+
+          <div className="recommendation-card-grid">
+            {subjectRecommendations.map((item) => (
+              <article className="recommendation-card" key={`${item.subject}-${item.score}`}>
+                <div className="recommendation-card-head">
+                  <div>
+                    <span>Курс</span>
+                    <h3>{item.subject}</h3>
+                  </div>
+                  <strong>{item.score}</strong>
+                </div>
+                <p>{item.recommendation}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RecommendationList({
+  title,
+  items,
+  variant,
+}: {
+  title: string;
+  items: string[];
+  variant: "strength" | "weakness";
+}) {
+  return (
+    <div className={`recommendation-list ${variant}`}>
+      <h3>{title}</h3>
+      {items.length ? (
+        <ul>
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>Данных пока нет.</p>
+      )}
+    </div>
+  );
+}
+
 function GradeSummary({
   grades,
   mode,
@@ -1821,6 +2128,7 @@ function GradeTable({
             {showStudent && <th>Ученик</th>}
             <th>Предмет</th>
             <th>Оценка</th>
+            <th>Дата</th>
           </tr>
         </thead>
         <tbody>
@@ -1836,6 +2144,7 @@ function GradeTable({
               <td>
                 <span className={`grade-pill grade-${grade.value}`}>{grade.value}</span>
               </td>
+              <td>{grade.lesson_date || (grade.created_at ? formatDate(grade.created_at) : "—")}</td>
             </tr>
           ))}
         </tbody>
@@ -1957,6 +2266,58 @@ function TokenHistory({ events }: { events: TokenEvent[] }) {
           </strong>
         </article>
       ))}
+    </div>
+  );
+}
+
+function TokenOperationTable({
+  operations,
+  showStudent = false,
+}: {
+  operations: TokenOperation[];
+  showStudent?: boolean;
+}) {
+  if (!operations.length) {
+    return <EmptyState title="Операций пока нет" text="Начисления и покупки выбранной группы появятся здесь после первых действий с AMT." />;
+  }
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            {showStudent && <th>Студент</th>}
+            <th>Операция</th>
+            <th>Сумма</th>
+            <th>Дата</th>
+            <th>Преподаватель</th>
+          </tr>
+        </thead>
+        <tbody>
+          {operations.map((operation) => (
+            <tr key={operation.id}>
+              {showStudent && (
+                <td>
+                  <strong>{operation.student_name || `Студент #${operation.student_id}`}</strong>
+                  <span>ID {operation.student_id}</span>
+                </td>
+              )}
+              <td>
+                <strong>{operation.reason || tokenOperationTitle[operation.operation_type]}</strong>
+                <span>{tokenOperationTitle[operation.operation_type]}</span>
+              </td>
+              <td>
+                <span className={`amount-pill ${operation.amount >= 0 ? "income" : "expense"}`}>
+                  {operation.amount > 0 ? "+" : ""}
+                  {operation.amount} AMT
+                </span>
+              </td>
+              <td>{formatDate(operation.created_at)}</td>
+              <td>{operation.teacher_name || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

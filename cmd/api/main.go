@@ -65,10 +65,11 @@ func main() {
 	achievementRepo := repositories.NewAchievementRepository(postgresRepo)
 	merchRepo := repositories.NewMerchRepository(postgresRepo)
 	recommendationRepo := repositories.NewRecommendationRepository(postgresRepo)
+	tokenOperationRepo := repositories.NewTokenOperationRepository(postgresRepo)
 	userRepository := repositories.NewUserRepository(postgresRepo)
 
-	studentService := services.NewStudentService(studentRepo, achievementRepo, userRepository, contractAdapter)
-	teacherService := services.NewTeacherService(teacherRepo, achievementRepo, studentService, groupRepo, subjectRepo, gradeRepo, studentRepo, userRepository)
+	studentService := services.NewStudentService(studentRepo, achievementRepo, tokenOperationRepo, userRepository, contractAdapter)
+	teacherService := services.NewTeacherService(teacherRepo, achievementRepo, studentService, groupRepo, subjectRepo, gradeRepo, studentRepo, tokenOperationRepo, userRepository)
 
 	aiService := services.NewAIService(os.Getenv("AI_SERVICE_URL"))
 
@@ -131,6 +132,7 @@ func setupRoutes(
 	teachers.Post("/groups/attach", teacherHandler.AttachGroup)
 	teachers.Get("/groups/:id/students", teacherHandler.GetStudentsForGroup)
 	teachers.Get("/groups/:id/grades", teacherHandler.GetGradesForGroup)
+	teachers.Get("/groups/:id/token-operations", teacherHandler.GetTokenOperationsForGroup)
 	teachers.Post("/subjects", teacherHandler.CreateSubject)
 	teachers.Get("/subjects", teacherHandler.GetSubjects)
 	teachers.Post("/subjects/attach", teacherHandler.AttachSubject)
@@ -150,6 +152,7 @@ func setupRoutes(
 	students.Get("/merch", studentHandler.GetMerch)
 	students.Post("/merch/buy", studentHandler.BuyMerch)
 	students.Get("/purchases", studentHandler.GetPurchases)
+	students.Get("/token-operations", studentHandler.GetTokenOperations)
 	students.Post("/recommendations", studentHandler.GenerateRecommendations)
 	students.Get("/recommendations", studentHandler.GetLatestRecommendation)
 }

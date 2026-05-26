@@ -22,10 +22,10 @@ export interface Group {
 export interface Student {
   id: number;
   name: string;
-  email: string;
+  email?: string;
   group_id: number;
-  tokens: number;
-  user_id: number;
+  tokens?: number;
+  user_id?: number;
 }
 
 export interface GradeView {
@@ -35,6 +35,8 @@ export interface GradeView {
   subject_id: number;
   subject_name: string;
   value: number;
+  lesson_date?: string;
+  created_at?: string;
 }
 
 export interface Grade {
@@ -42,6 +44,8 @@ export interface Grade {
   student_id: number;
   subject_id: number;
   value: number;
+  lesson_date?: string;
+  created_at?: string;
 }
 
 export interface Subject {
@@ -106,4 +110,39 @@ export interface StudentMeResponse {
   group_id: number;
   tokens: number;
   wallet_address: string;
+}
+
+export interface SubjectRecommendation {
+  subject: string;
+  score: number;
+  recommendation: string;
+}
+
+export interface AIRecommendation {
+  student_id: string;
+  student_name: string;
+  student_surname: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: SubjectRecommendation[];
+  general_advice: string;
+}
+
+export interface StoredRecommendation {
+  id: number;
+  student_id: number;
+  payload: AIRecommendation;
+  created_at: string;
+}
+
+export interface TokenOperation {
+  id: number;
+  student_id: number;
+  student_name?: string;
+  teacher_id?: number;
+  teacher_name?: string;
+  amount: number;
+  operation_type: "achievement_reward" | "manual_award" | "purchase";
+  reason?: string;
+  created_at: string;
 }

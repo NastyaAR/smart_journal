@@ -13,8 +13,10 @@ import type {
   SessionResponse,
   StudentGroupResponse,
   StudentMeResponse,
+  StoredRecommendation,
   Subject,
   Student,
+  TokenOperation,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -178,6 +180,9 @@ export const api = {
   studentMerch: () => requestArray<Merch>("/students/merch"),
   studentPurchases: () => requestArray<Purchase>("/students/purchases"),
   studentAchievements: () => requestArray<Achievement>("/students/achievements"),
+  studentTokenOperations: () => requestArray<TokenOperation>("/students/token-operations"),
+  latestRecommendation: () => request<StoredRecommendation>("/students/recommendations"),
+  generateRecommendation: () => post<StoredRecommendation>("/students/recommendations"),
   createAchievement: (payload: { title: string; description?: string }) =>
     post<Achievement>("/students/achievements", payload),
   buyMerch: (merch_id: number) =>
@@ -197,12 +202,14 @@ export const api = {
       student_id,
       group_id,
     }),
-  setGrade: (payload: { student_id: number; subject_id: number; value: number }) =>
+  setGrade: (payload: { student_id: number; subject_id: number; value: number; lesson_date?: string }) =>
     post<Grade>("/teachers/grades", payload),
   teacherGroupGrades: (groupId: number) =>
     requestArray<GradeView>(`/teachers/groups/${groupId}/grades`),
   teacherGroupStudents: (groupId: number) =>
     requestArray<Student>(`/teachers/groups/${groupId}/students`),
+  teacherGroupTokenOperations: (groupId: number) =>
+    requestArray<TokenOperation>(`/teachers/groups/${groupId}/token-operations`),
   pendingAchievements: () =>
     requestArray<PendingAchievementView>("/teachers/achievements/pending"),
   confirmAchievement: (achievement_id: number) =>

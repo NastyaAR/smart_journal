@@ -13,14 +13,15 @@ import (
 )
 
 type TeacherService struct {
-	repo            *repositories.TeacherRepository
-	achievementRepo *repositories.AchievementRepository
-	studentService  repositories.StudentServiceManager
-	groupRepo       *repositories.GroupRepository
-	subjectRepo     *repositories.SubjectRepository
-	gradeRepo       *repositories.GradeRepository
-	studentRepo     *repositories.StudentRepository
-	userRepository  *repositories.UserRepository
+	repo               *repositories.TeacherRepository
+	achievementRepo    *repositories.AchievementRepository
+	studentService     repositories.StudentServiceManager
+	groupRepo          *repositories.GroupRepository
+	subjectRepo        *repositories.SubjectRepository
+	gradeRepo          *repositories.GradeRepository
+	studentRepo        *repositories.StudentRepository
+	tokenOperationRepo *repositories.TokenOperationRepository
+	userRepository     *repositories.UserRepository
 }
 
 func NewTeacherService(
@@ -31,17 +32,19 @@ func NewTeacherService(
 	subjectRepo *repositories.SubjectRepository,
 	gradeRepo *repositories.GradeRepository,
 	studentRepo *repositories.StudentRepository,
+	tokenOperationRepo *repositories.TokenOperationRepository,
 	userRepository *repositories.UserRepository,
 ) *TeacherService {
 	return &TeacherService{
-		repo:            repo,
-		achievementRepo: achievementRepo,
-		studentService:  studentService,
-		groupRepo:       groupRepo,
-		subjectRepo:     subjectRepo,
-		gradeRepo:       gradeRepo,
-		studentRepo:     studentRepo,
-		userRepository:  userRepository,
+		repo:               repo,
+		achievementRepo:    achievementRepo,
+		studentService:     studentService,
+		groupRepo:          groupRepo,
+		subjectRepo:        subjectRepo,
+		gradeRepo:          gradeRepo,
+		studentRepo:        studentRepo,
+		tokenOperationRepo: tokenOperationRepo,
+		userRepository:     userRepository,
 	}
 }
 
@@ -103,6 +106,18 @@ func (s *TeacherService) AwardTokensManually(ctx context.Context, studentID, tea
 	studentAddress := common.HexToAddress(fmt.Sprintf("0x%040d", studentID))
 	if err := s.studentService.GetContractAdapter().AwardTokens(studentAddress, points); err != nil {
 		return fmt.Errorf("failed to award tokens on blockchain: %w", err)
+	}
+
+	if s.tokenOperationRepo != nil {
+		if err := s.tokenOperationRepo.Create(ctx, &models.TokenOperation{
+			StudentID:     studentID,
+			TeacherID:     &teacherID,
+			Amount:        amount,
+			OperationType: "manual_award",
+			Reason:        "Manual award",
+		}); err != nil {
+			return fmt.Errorf("failed to record token operation: %w", err)
+		}
 	}
 
 	return nil
@@ -225,6 +240,16 @@ func (s *TeacherService) GetGradeViewsByGroupID(ctx context.Context, teacherID, 
 		return nil, err
 	}
 	return s.gradeRepo.GetGradeViewsByGroupID(ctx, groupID)
+}
+
+func (s *TeacherService) GetTokenOperationsByGroupID(ctx context.Context, teacherID, groupID int) ([]*models.TokenOperation, error) {
+	if err := s.requireGroupAccess(ctx, teacherID, groupID); err != nil {
+		return nil, err
+	}
+	if s.tokenOperationRepo == nil {
+		return []*models.TokenOperation{}, nil
+	}
+	return s.tokenOperationRepo.GetByGroupID(ctx, groupID)
 }
 
 func (s *TeacherService) requireGroupAccess(ctx context.Context, teacherID, groupID int) error {

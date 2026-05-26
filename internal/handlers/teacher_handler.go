@@ -327,6 +327,28 @@ func (h *TeacherHandler) GetGradesForGroup(c *fiber.Ctx) error {
 	return c.JSON(grades)
 }
 
+func (h *TeacherHandler) GetTokenOperationsForGroup(c *fiber.Ctx) error {
+	groupID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid group ID"})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	teacher, err := h.currentTeacher(c, ctx)
+	if err != nil {
+		return handleFiberError(c, err)
+	}
+
+	operations, err := h.teacherService.GetTokenOperationsByGroupID(ctx, teacher.ID, groupID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(operations)
+}
+
 func (h *TeacherHandler) GetPendingAchievements(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
