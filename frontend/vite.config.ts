@@ -15,4 +15,14 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: [
+      'micromark',
+      'micromark-core-commonmark', 
+      'micromark-extension-gfm',
+      'micromark-util-character',
+      'micromark-util-chunked',
+      'micromark-util-combine-extensions',
+    ],
+  },
 });

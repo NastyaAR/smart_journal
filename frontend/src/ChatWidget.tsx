@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { MessageSquare, X, Send, Loader2 } from "lucide-react";
 import { api } from "./api";
 
@@ -109,7 +110,13 @@ export function ChatWidget() {
                 key={idx}
                 className={`chat-message ${msg.role}`}
               >
-                <div className="message-content">{msg.content}</div>
+                <div className="message-content markdown">
+                  {msg.role === "assistant" ? (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
                 <div className="message-time">
                   {msg.timestamp.toLocaleTimeString("ru-RU", {
                     hour: "2-digit",
